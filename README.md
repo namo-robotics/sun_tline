@@ -13,7 +13,7 @@ Playback speed is measured in line transits per wall-clock second; physical time
 and transit time are shown below the plots.
 
 The source defaults to an ideal voltage source (0 Ω source resistance) and supports
-a step, a finite pulse, and sine excitation. Source matching presets explicitly
+a step, a rectangular pulse, a single-cycle sine pulse, and continuous sine excitation. Source matching presets explicitly
 set their source resistance. Terminations are
 open, shorted, resistive, capacitive, inductive, or series RC/RL/RLC. Settings use
 SI units, including seconds, farads, and henries; scientific notation is accepted.
@@ -23,6 +23,11 @@ Selecting a preset immediately installs it and pauses playback. Selecting a sour
 waveform applies the current settings and resets playback immediately; invalid
 settings leave the active simulation unchanged. The active waveform is shown
 beside the simulation time.
+
+**Sine pulse** emits one full sine cycle over the selected **Pulse width**, then
+returns to zero. Its frequency is the inverse of its width; the separate frequency
+field applies only to continuous **Sine**. The sine pulse requires at least 100
+simulation steps across its width.
 
 The default pulse lasts 12.5 ns, a quarter of the default line transit time, so
 both edges fit on the line before reflection. Longer pulse widths are allowed;

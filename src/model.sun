@@ -7,7 +7,7 @@ public module tline {
   public enum Load { Open, Short, Resistor, Capacitor, Inductor, RC, RL, RLC }
 
   /** Selects a source switched on at simulation time zero. */
-  public enum Wave { Step, Pulse, Sine }
+  public enum Wave { Step, Pulse, Sine, SinePulse }
 
   /** Stores physical parameters in SI units and the numerical resolution. */
   public class Config {
@@ -77,11 +77,12 @@ public module tline {
           (not positive(this.inductance) or not positive(this.inductance / (this.z + this.r())) or
             dt * 20.0 > this.inductance / (this.z + this.r()))) or
         (this.wave == Wave.Sine and (not positive(this.frequency) or dt * this.frequency > 0.01)) or
-        (this.wave == Wave.Pulse and (not positive(this.pulse) or dt * 20.0 > this.pulse))) {
+        (this.wave == Wave.Pulse and (not positive(this.pulse) or dt * 20.0 > this.pulse)) or
+        (this.wave == Wave.SinePulse and (not positive(this.pulse) or dt * 100.0 > this.pulse))) {
         return SystemResult.Error(
           Error(
             1,
-            "Increase cells or slow the source/load: reactive time scales and pulses need 20 steps, sine periods 100 steps."
+            "Increase cells or slow the source/load: reactive time scales and pulses need 20 steps, sine periods and sine pulses 100 steps."
           )
         );
       }
@@ -100,8 +101,11 @@ public module tline {
       if (this.wave == Wave.Sine) {
         return this.amplitude * sine(6.283185307179586 * this.frequency * time);
       }
-      if (this.wave == Wave.Pulse and time >= this.pulse) {
+      if ((this.wave == Wave.Pulse or this.wave == Wave.SinePulse) and time >= this.pulse) {
         return 0.0;
+      }
+      if (this.wave == Wave.SinePulse) {
+        return this.amplitude * sine(6.283185307179586 * (time / this.pulse));
       }
       return this.amplitude;
     }

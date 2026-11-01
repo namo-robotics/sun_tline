@@ -118,6 +118,48 @@ module model_tests {
     return TestResult.Ok;
   }
 
+  /** A sine pulse contains one complete cycle and is exactly off after its width. */
+  test_function sine_pulse_shape_and_propagation() TestResult<void> {
+    var c = tline.Config();
+    c.wave = tline.Wave.SinePulse;
+    try c.validate();
+    try near(c.source(0.0), 0.0, 1e-12);
+    try near(c.source(c.pulse * 0.25), 1.0, 1e-12);
+    try near(c.source(c.pulse * 0.5), 0.0, 1e-12);
+    try near(c.source(c.pulse * 0.75), -1.0, 1e-12);
+    try std.test.assert_eq(c.source(c.pulse), 0.0);
+    try std.test.assert_eq(c.source(c.pulse * 2.0), 0.0);
+    var s = try tline.Simulation(c);
+    s.advance(256);
+    try near(s.voltage(160), -1.0, 1e-12);
+    try near(s.voltage(224), 1.0, 1e-12);
+    try near(s.voltage(64), 0.0, 1e-12);
+    s.advance(512 * 48);
+    try near(s.voltage(256), 0.0, 1e-10);
+    return TestResult.Ok;
+  }
+
+  /** Rejects sine pulses too short to resolve a complete cycle. */
+  test_function sine_pulse_resolution() TestResult<void> {
+    var c = tline.Config();
+    c.wave = tline.Wave.SinePulse;
+    c.pulse = 1e-9;
+    match c.validate() {
+      SystemResult.Ok => {
+        try std.test.assert(false);
+      },
+      SystemResult.Error(_) => {}
+    };
+    c.pulse = 0.0;
+    match c.validate() {
+      SystemResult.Ok => {
+        try std.test.assert(false);
+      },
+      SystemResult.Error(_) => {}
+    };
+    return TestResult.Ok;
+  }
+
   /** Checks a lossless round trip retains a pulse after its ideal source switches off. */
   test_function undamped_energy() TestResult<void> {
     var c = tline.Config();

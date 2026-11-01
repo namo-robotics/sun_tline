@@ -57,7 +57,7 @@ public module app {
 
   /** Names one source waveform. */
   public function wave_name(index: i64) String {
-    return String(index == 0 ? "Step" : index == 1 ? "Pulse" : "Sine");
+    return String(index == 0 ? "Step" : index == 1 ? "Pulse" : index == 2 ? "Sine" : "Sine pulse");
   }
 
   /** Names an educational preset. */
@@ -143,7 +143,7 @@ public module app {
         return this.load_index == 4 or this.load_index >= 6;
       }
       if (index == 8) {
-        return this.wave_index == 1;
+        return this.wave_index == 1 or this.wave_index == 3;
       }
       if (index == 9) {
         return this.wave_index == 2;
@@ -193,7 +193,8 @@ public module app {
       }
       var c = tline.Config();
       c.load = load(this.load_index);
-      c.wave = this.wave_index == 0 ? tline.Wave.Step : this.wave_index == 1 ? tline.Wave.Pulse : tline.Wave.Sine;
+      c.wave = this.wave_index == 0 ? tline.Wave.Step : this.wave_index == 1 ? tline.Wave.Pulse : this.wave_index ==
+        2 ? tline.Wave.Sine : tline.Wave.SinePulse;
       c.amplitude = values[0];
       c.source_r = values[1];
       c.z = values[2];
@@ -240,7 +241,7 @@ public module app {
       this.sync_fields();
       this.load_index = this.active_load;
       this.wave_index = this.simulation.config.wave == tline.Wave.Step ? 0 : this.simulation.config.wave ==
-        tline.Wave.Pulse ? 1 : 2;
+        tline.Wave.Pulse ? 1 : this.simulation.config.wave == tline.Wave.Sine ? 2 : 3;
       this.apply();
     }
 

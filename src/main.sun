@@ -100,6 +100,23 @@ module desktop {
         )
       );
     }
+    try renderer.edit(session.tree.identity_path(path), empty, 3);
+    renderer.poll(session.tree, session.queue, false);
+    try session.dispatch(renderer);
+    if (session.state.simulation.config.wave != tline.Wave.SinePulse or
+      session.state.simulation.steps != 0) {
+      return SystemResult.Error(
+        Error(1, "Sine pulse selection did not reset the active waveform")
+      );
+    }
+    session.state.advance(256);
+    if (tline.absolute(session.state.simulation.voltage(160) + 1.0) > 1e-10 or
+      tline.absolute(session.state.simulation.voltage(224) - 1.0) > 1e-10 or
+      session.state.simulation.voltage(64) != 0.0) {
+      return SystemResult.Error(
+        Error(1, "Sine pulse did not propagate both lobes followed by zero")
+      );
+    }
     return SystemResult.Ok;
   }
 

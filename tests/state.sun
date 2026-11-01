@@ -70,6 +70,23 @@ module state_tests {
     return TestResult.Ok;
   }
 
+  /** Sine-pulse settings expose duration, retain their mode on reset, and ignore continuous-sine frequency. */
+  test_function sine_pulse_settings() TestResult<void> {
+    var s = try app.State();
+    s.wave_index = 3;
+    try std.test.assert(s.field_visible(8));
+    try std.test.assert(not s.field_visible(9));
+    ignore_error(s.fields.set(9, String("unused")));
+    s.apply();
+    try std.test.assert(s.simulation.config.wave == tline.Wave.SinePulse);
+    s.advance(256);
+    s.reset();
+    try std.test.assert_eq(s.wave_index, 3);
+    try std.test.assert_eq(s.simulation.steps, 0);
+    try std.test.assert(s.simulation.config.wave == tline.Wave.SinePulse);
+    return TestResult.Ok;
+  }
+
   /** Invalid drafts leave the existing circuit and time untouched. */
   test_function atomic_settings() TestResult<void> {
     var s = try app.State();
