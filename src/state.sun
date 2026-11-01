@@ -99,7 +99,7 @@ public module app {
     public var components: bool = false;
     public var speed: f64 = 1.0;
     public var credit: f64 = 0.0;
-    public var voltage_scale: f64 = 1.2;
+    public var voltage_scale: f64 = 2.0;
     public var current_scale: f64 = 0.024;
     public var message: String = String("Paused — choose a preset or press Run.");
     public var history: Vec<tline.Sample>;
@@ -333,6 +333,24 @@ public module app {
       }
     }
 
+    /** Interpolates forward propagation for display without changing the fixed-step solver. */
+    public const method display_plus(cell: i64) f64 {
+      var here = this.simulation.plus(cell);
+      if (cell == 0 or cell == this.simulation.config.cells) {
+        return here;
+      }
+      return here + this.credit * (this.simulation.plus(cell - 1) - here);
+    }
+
+    /** Interpolates backward propagation while preserving the solved terminal constraints. */
+    public const method display_minus(cell: i64) f64 {
+      var here = this.simulation.minus(cell);
+      if (cell == 0 or cell == this.simulation.config.cells) {
+        return here;
+      }
+      return here + this.credit * (this.simulation.minus(cell + 1) - here);
+    }
+
     /** Converts elapsed animation time into bounded work without skipping simulation steps. */
     public method tick(seconds: f64) void {
       if (not this.running) {
@@ -355,6 +373,7 @@ public module app {
       if (v < 1e-12) {
         v = 1.0;
       }
+      var minimum_voltage_scale = 2.0 * v;
       var current = v / this.simulation.config.z;
       for (var i: i64 = 0; i <= this.simulation.config.cells; i += 1) {
         var sv = tline.absolute(this.simulation.voltage(i));
@@ -381,6 +400,9 @@ public module app {
         }
       }
       this.voltage_scale = v * 1.2;
+      if (this.voltage_scale < minimum_voltage_scale) {
+        this.voltage_scale = minimum_voltage_scale;
+      }
       this.current_scale = current * 1.2;
     }
   }

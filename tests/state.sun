@@ -29,6 +29,47 @@ module state_tests {
     return TestResult.Ok;
   }
 
+  /** Fractional playback moves the visible wave while keeping numerical steps deterministic. */
+  test_function fractional_wave_motion() TestResult<void> {
+    var s = try app.State();
+    s.running = true;
+    var initial = s.simulation.plus(0);
+    s.tick(0.5 / 512.0);
+    try std.test.assert_eq(s.simulation.steps, 0);
+    try std.test.assert_eq(s.simulation.plus(1), 0.0);
+    try std.test.assert(tline.absolute(s.display_plus(1) - initial * 0.5) < 1e-12);
+    var frozen = s.display_plus(1);
+    s.running = false;
+    s.tick(1.0);
+    try std.test.assert_eq(s.display_plus(1), frozen);
+    s.running = true;
+    s.tick(0.5 / 512.0);
+    try std.test.assert_eq(s.simulation.steps, 1);
+    try std.test.assert_eq(s.display_plus(1), initial);
+    s.reset();
+    try std.test.assert_eq(s.credit, 0.0);
+    try s.preset(3);
+    s.advance(511);
+    s.credit = 0.5;
+    try std.test.assert_eq(s.display_plus(512) + s.display_minus(512), 0.0);
+    return TestResult.Ok;
+  }
+
+  /** Reserves both polarities of twice the source amplitude so reflected voltage remains visible. */
+  test_function reflection_voltage_limits() TestResult<void> {
+    var s = try app.State();
+    try std.test.assert_eq(s.voltage_scale, 2.0);
+    ignore_error(s.fields.set(0, String("3")));
+    s.apply();
+    try std.test.assert_eq(s.voltage_scale, 6.0);
+    s.rescale();
+    try std.test.assert_eq(s.voltage_scale, 6.0);
+    ignore_error(s.fields.set(0, String("-2")));
+    s.apply();
+    try std.test.assert_eq(s.voltage_scale, 4.0);
+    return TestResult.Ok;
+  }
+
   /** Invalid drafts leave the existing circuit and time untouched. */
   test_function atomic_settings() TestResult<void> {
     var s = try app.State();

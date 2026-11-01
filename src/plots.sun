@@ -3,6 +3,48 @@ using std;
 /** Converts simulation snapshots into vector plots without owning native resources. */
 public module charts {
 
+  /** Removes visually redundant samples while bounding vertical error at every original sample. */
+  function simplify(series: ref plot.Series, tolerance: f64) void {
+    if (series.points.size() < 3) {
+      return;
+    }
+    var a = make_heap_allocator();
+    var reduced = Vec<plot.Point>(a, series.points.size());
+    var anchor: i64 = 0;
+    var lower: f64 = -1e300;
+    var upper: f64 = 1e300;
+    reduced.push(plot.Point(series.points[0].x, series.points[0].y));
+    for (var index: i64 = 1; index < series.points.size(); index += 1) {
+      var dx = series.points[index].x - series.points[anchor].x;
+      var dy = series.points[index].y - series.points[anchor].y;
+      if (dx <= 0.0) {
+        continue;
+      }
+      var slope = dy / dx;
+      if (slope < lower or slope > upper) {
+        anchor = index - 1;
+        reduced.push(plot.Point(series.points[anchor].x, series.points[anchor].y));
+        lower = -1e300;
+        upper = 1e300;
+        dx = series.points[index].x - series.points[anchor].x;
+        dy = series.points[index].y - series.points[anchor].y;
+      }
+      if (dx > 0.0) {
+        var low = (dy - tolerance) / dx;
+        var high = (dy + tolerance) / dx;
+        if (low > lower) {
+          lower = low;
+        }
+        if (high < upper) {
+          upper = high;
+        }
+      }
+    }
+    var end = series.points.size() - 1;
+    reduced.push(plot.Point(series.points[end].x, series.points[end].y));
+    series.points = reduced;
+  }
+
   /** Builds a spatial voltage or current plot with optional traveling components. */
   function spatial(state: const ref app.State, current: bool) SystemResult<ui_drawing.Drawing> {
     var f = plot.Figure(
@@ -20,8 +62,8 @@ public module charts {
     }
     for (var i: i64 = 0; i <= cells; i += stride) {
       var x = _convert<f64>(i) * state.simulation.config.length / _convert<f64>(cells);
-      var p = state.simulation.plus(i);
-      var m = state.simulation.minus(i);
+      var p = state.display_plus(i);
+      var m = state.display_minus(i);
       if (current) {
         p /= state.simulation.config.z;
         m /= -state.simulation.config.z;
@@ -32,8 +74,8 @@ public module charts {
     }
     // Include the exact load boundary even when display decimation does not divide the grid.
     if (cells % stride != 0) {
-      var p = state.simulation.plus(cells);
-      var m = state.simulation.minus(cells);
+      var p = state.display_plus(cells);
+      var m = state.display_minus(cells);
       if (current) {
         p /= state.simulation.config.z;
         m /= -state.simulation.config.z;
@@ -42,6 +84,10 @@ public module charts {
       plus.add(state.simulation.config.length, p);
       minus.add(state.simulation.config.length, m);
     }
+    var tolerance = (current ? state.current_scale : state.voltage_scale) * 0.001;
+    simplify(total, tolerance);
+    simplify(plus, tolerance);
+    simplify(minus, tolerance);
     f.add(total);
     if (state.components) {
       f.add(plus);
@@ -50,7 +96,7 @@ public module charts {
     var scale = current ? state.current_scale : state.voltage_scale;
     f.x_limits = Option.Some(plot.Limits(0.0, state.simulation.config.length));
     f.y_limits = Option.Some(plot.Limits(-scale, scale));
-    return f.draw(540.0, 330.0);
+    return f.draw(1090.0, 300.0);
   }
 
   /** Builds a bounded chronological terminal trace using physical nanoseconds. */
@@ -80,6 +126,9 @@ public module charts {
     var latest = state.simulation.sample();
     source.add(latest.time * 1e9, current ? latest.source_i : latest.source_v);
     load.add(latest.time * 1e9, current ? latest.load_i : latest.load_v);
+    var tolerance = (current ? state.current_scale : state.voltage_scale) * 0.001;
+    simplify(source, tolerance);
+    simplify(load, tolerance);
     f.add(source);
     f.add(load);
     var start = state.history[state.history_index(0)].time * 1e9;
@@ -95,7 +144,7 @@ public module charts {
 
   /** Draws the source, two-conductor line, load, and four synchronized charts. */
   public function draw(state: const ref app.State) SystemResult<ui_drawing.Drawing> {
-    var d = ui_drawing.Drawing(1100.0, 820.0);
+    var d = ui_drawing.Drawing(1100.0, 1080.0);
     var ink = String("#176b87");
     d.text(30.0, 32.0, String("SUN TLINE  /  Lossless transmission line"), 23.0, false, 0.0);
     d.circle(65.0, 92.0, 22.0, String("#e4f2f5"));
@@ -130,9 +179,9 @@ public module charts {
     var vt = try history(state, false);
     var it = try history(state, true);
     d.place(5.0, 150.0, v);
-    d.place(555.0, 150.0, i);
-    d.place(5.0, 480.0, vt);
-    d.place(555.0, 480.0, it);
+    d.place(5.0, 450.0, i);
+    d.place(5.0, 750.0, vt);
+    d.place(555.0, 750.0, it);
     return SystemResult.Ok(d);
   }
 }

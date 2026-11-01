@@ -19,9 +19,14 @@ Edit settings and press **Apply and reset**. Invalid settings leave the current
 experiment intact. **Reset** discards unapplied edits and restarts the active circuit.
 Selecting a preset immediately installs it and pauses playback.
 
+Voltage and current wave plots each occupy a full row; terminal histories share
+the row below. Playback targets 60 frames per second with display-only subcell
+interpolation, while the numerical solver retains its fixed step.
+
 **Traveling components** separates the forward/backward waves. Positive current
 points toward the load, so a backward voltage wave has negative current.
-Plot limits stay fixed until **Rescale** or a circuit reset; rescale if a trace
+Voltage limits cover at least −2× to +2× the source amplitude so reflections stay
+visible. Plot limits stay fixed until **Rescale** or a circuit reset; rescale if a trace
 moves outside the visible range. The history ring keeps approximately the most
 recent 32 line transits. A new circuit begins unenergized, with its source boundary
 launched at time zero.
@@ -41,6 +46,7 @@ published Sun compiler first. Linux needs GTK4 development libraries, librsvg ru
 ```sh
 ./scripts/install-dependencies.sh
 ./build.sh --test                 # Sun-only physics and state tests
+./build.sh --plot-test            # Curve accuracy; needs sun_ui/sun_plot, no display
 ./build.sh --build
 ./build/sun_tline
 ```

@@ -32,6 +32,10 @@ module build_tasks {
     command.add_arg("-c");
     command.add_arg("-o");
     command.add_arg(target.output);
+    if (String(name).equals_literal("plot-tests")) {
+      command.add_arg("--lib-path");
+      command.add_arg(setting("SUN_UI_BUILD", "build/dependencies/sun_ui/build"));
+    }
     if (native) {
       var ui_path = setting("SUN_UI_BUILD", "build/dependencies/sun_ui/build");
       var gtk_path = setting("SUN_GOBJECT_BUILD", "build/dependencies/sun_gobject/build");
@@ -69,10 +73,10 @@ module build_tasks {
   }
 
   /** Runs headless tests from the configured output. */
-  function test() SystemResult<void> {
-    try compile("tests", false);
+  function test(name: static_ptr<u8>) SystemResult<void> {
+    try compile(name, false);
     var a = make_heap_allocator();
-    var target = try build_targets.load("tests");
+    var target = try build_targets.load(name);
     var command = std.process.Command(a, target.tests);
     return run(command);
   }
@@ -91,16 +95,22 @@ module build_tasks {
     var text = output.stdout().clone(a);
     text.append(output.stderr());
     try std.io.write_string(path, text);
+    if (mode.equals_literal("--plot-test")) {
+      return test("plot-tests");
+    }
     if (mode.equals_literal("--test")) {
-      return test();
+      return test("tests");
     }
     if (not mode.equals_literal("--build") and not mode.equals_literal("--all") and
       not mode.equals_literal("--self-test")) {
-      return SystemResult.Error(Error(1, "Usage: ./build.sh [--all|--build|--test|--self-test]"));
+      return SystemResult.Error(
+        Error(1, "Usage: ./build.sh [--all|--build|--test|--plot-test|--self-test]")
+      );
     }
     try compile("sun_tline", true);
     if (mode.equals_literal("--all")) {
-      try test();
+      try test("tests");
+      try test("plot-tests");
     }
     if (mode.equals_literal("--all") or mode.equals_literal("--self-test")) {
       var target = try build_targets.load("sun_tline");

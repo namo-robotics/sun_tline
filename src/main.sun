@@ -102,6 +102,22 @@ module desktop {
       try renderer.set_default_size(1100, 800);
       try paint(area, session.state);
       try await_paint(renderer, session, area);
+      // Exercise a full history buffer so frame timing includes the expensive steady workload.
+      session.state.advance(512 * 40);
+      session.state.running = true;
+      var started = std.time.now();
+      for (var frame: i64 = 0; frame < 60; frame += 1) {
+        session.state.tick(1.0 / 60.0);
+        try paint(area, session.state);
+        try session.render(renderer);
+        renderer.poll(session.tree, session.queue, false);
+      }
+      var duration = started.elapsed();
+      println(
+        `Full-history frame preparation: ${duration.as_secs_f64() * 1000.0 / 60.0} ms/frame`
+      );
+      session.state.running = false;
+      try await_paint(renderer, session, area);
       var drawing = try charts.draw(session.state);
       var path = String("build/acceptance.svg");
       try drawing.save(path);
@@ -123,13 +139,19 @@ module desktop {
       var elapsed = now.since(previous);
       previous = now;
       session.state.tick(elapsed.as_secs_f64());
-      if (session.state.simulation.steps != last_step or session.state.revision != last_revision) {
+      if (session.state.running or session.state.simulation.steps != last_step or
+        session.state.revision != last_revision) {
         try paint(area, session.state);
         try session.render(renderer);
         last_step = session.state.simulation.steps;
         last_revision = session.state.revision;
       }
-      std.time.sleep(std.time.create_duration_millis(20));
+      // Account for drawing work rather than adding a fixed delay to every frame.
+      var work = previous.elapsed();
+      var remaining = 1.0 / 60.0 - work.as_secs_f64();
+      if (remaining > 0.0) {
+        std.time.sleep(std.time.create_duration_nanos(_convert<i64>(remaining * 1e9)));
+      }
     }
     session.tree.shutdown(renderer);
     try renderer.unregister_drawing(1);

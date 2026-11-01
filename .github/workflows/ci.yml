@@ -26,6 +26,8 @@ jobs:
         run: |
           sun fmt --check src tests
           ./build.sh --test
+      - name: Plot accuracy tests
+        run: ./build.sh --plot-test
       - name: Build and GTK acceptance
         run: xvfb-run -a dbus-run-session -- ./build.sh --self-test
       - name: Package and smoke-test
@@ -51,6 +53,8 @@ jobs:
           ./scripts/install-dependencies.sh
       - name: Headless tests
         run: ./build.sh --test
+      - name: Plot accuracy tests
+        run: ./build.sh --plot-test
       - name: Build and GTK acceptance
         run: ./build.sh --self-test
       - name: Package and smoke-test

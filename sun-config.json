@@ -1,9 +1,34 @@
 {
   "root": true,
-  "sun_path": ["build"],
+  "sun_path": [
+    "build"
+  ],
   "entrypoints": [
-    {"name":"sun_tline", "path":"src/main.sun", "type":"binary", "output_name":"build/sun_tline"},
-    {"name":"tests", "path":"tests/main.sun", "type":"binary", "output_name":"build/tline-tests", "test_binary_name":"build/tline-tests_test"},
-    {"name":"build-tool", "path":"src/tools/build.sun", "type":"binary", "output_name":"build/tline-build"}
+    {
+      "name": "sun_tline",
+      "path": "src/main.sun",
+      "type": "binary",
+      "output_name": "build/sun_tline"
+    },
+    {
+      "name": "tests",
+      "path": "tests/main.sun",
+      "type": "binary",
+      "output_name": "build/tline-tests",
+      "test_binary_name": "build/tline-tests_test"
+    },
+    {
+      "name": "build-tool",
+      "path": "src/tools/build.sun",
+      "type": "binary",
+      "output_name": "build/tline-build"
+    },
+    {
+      "name": "plot-tests",
+      "path": "tests/plots/main.sun",
+      "type": "binary",
+      "output_name": "build/plot-tests",
+      "test_binary_name": "build/plot-tests_test"
+    }
   ]
 }
