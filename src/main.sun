@@ -5,8 +5,7 @@ module desktop {
 
   /** Replaces a drawing only after its SVG parses successfully. */
   function paint(area: ref gtk.DrawingArea, state: const ref app.State) SystemResult<void> {
-    var drawing = try charts.draw(state);
-    var content = drawing.svg();
+    var content = try charts.document(state);
     var document = try svg.Document(content);
     area.set_document(document);
     return SystemResult.Ok;
@@ -119,9 +118,9 @@ module desktop {
       try controls_test(renderer, session);
       try paint(area, session.state);
       try await_paint(renderer, session, area);
-      var pulse_drawing = try charts.draw(session.state);
+      var pulse_drawing = try charts.document(session.state);
       var pulse_path = String("build/pulse-acceptance.svg");
-      try pulse_drawing.save(pulse_path);
+      try std.io.write_string(pulse_path, pulse_drawing);
       for (var p: i64 = 0; p < 8; p += 1) {
         try session.state.preset(p);
         session.state.advance(2048);
@@ -149,9 +148,9 @@ module desktop {
       );
       session.state.running = false;
       try await_paint(renderer, session, area);
-      var drawing = try charts.draw(session.state);
+      var drawing = try charts.document(session.state);
       var path = String("build/acceptance.svg");
-      try drawing.save(path);
+      try std.io.write_string(path, drawing);
       session.tree.shutdown(renderer);
       try renderer.unregister_drawing(1);
       if (renderer.creates != renderer.removals) {

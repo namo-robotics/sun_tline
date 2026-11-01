@@ -29,6 +29,7 @@ both edges fit on the line before reflection. Longer pulse widths are allowed;
 when the width exceeds the transit time, the leading edge reaches the load
 before the source switches off, initially resembling a step.
 
+The dark studio interface uses red voltage waves and green current waves.
 Voltage and current wave plots each occupy a full row. Playback targets 60 frames
 per second with display-only subcell interpolation, while the numerical solver
 retains its fixed step.

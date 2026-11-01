@@ -52,9 +52,16 @@ public module charts {
       String("Distance (m)"),
       String(current ? "Current (A)" : "Voltage (V)")
     );
-    var total = plot.Series(String("Total"), String("#176b87"), false);
-    var plus = plot.Series(String("Toward load"), String("#c77818"), false);
-    var minus = plot.Series(String("Toward source"), String("#9953a1"), false);
+    var total = plot.Series(String("Total"), String(current ? "#49df9b" : "#ff646e"), false);
+    var plus = plot.Series(String("Toward load"), String(current ? "#b2f1ca" : "#ffb0b6"), false);
+    var minus = plot.Series(
+      String("Toward source"),
+      String(current ? "#239e70" : "#ca4058"),
+      false
+    );
+    total.line_width = 2.6;
+    plus.line_width = 1.5;
+    minus.line_width = 1.5;
     var cells = state.simulation.config.cells;
     var stride = cells / 512;
     if (stride < 1) {
@@ -99,12 +106,24 @@ public module charts {
     return f.draw(1090.0, 300.0);
   }
 
+  /** Applies the application palette to the toolkit's fixed SVG chrome for display and export alike. */
+  public function document(state: const ref app.State) SystemResult<String> {
+    var drawing = try draw(state);
+    var content = drawing.svg();
+    // Match only complete paint attributes; waveform colors and user labels are untouched.
+    content.replace("fill=\"white\"", "fill=\"#0b1220\"");
+    content.replace("fill=\"#202735\"", "fill=\"#dce6f4\"");
+    content.replace("stroke=\"#343d4d\"", "stroke=\"#65748b\"");
+    content.replace("stroke=\"#e1e5eb\"", "stroke=\"#243145\"");
+    return SystemResult.Ok(content);
+  }
+
   /** Draws the source, two-conductor line, load, and two synchronized wave plots. */
   public function draw(state: const ref app.State) SystemResult<ui_drawing.Drawing> {
     var d = ui_drawing.Drawing(1100.0, 750.0);
-    var ink = String("#176b87");
+    var ink = String("#91a3bc");
     d.text(30.0, 32.0, String("SUN TLINE  /  Lossless transmission line"), 23.0, false, 0.0);
-    d.circle(65.0, 92.0, 22.0, String("#e4f2f5"));
+    d.circle(65.0, 92.0, 22.0, String("#23334b"));
     d.text(65.0, 97.0, String("Vs"), 16.0, true, 0.0);
     d.line(65.0, 70.0, 985.0, 70.0, ink, 2.0);
     d.line(65.0, 114.0, 985.0, 114.0, ink, 2.0);
@@ -128,7 +147,7 @@ public module charts {
       0.0
     );
     if (state.active_load != 0) {
-      d.line(985.0, 70.0, 985.0, 114.0, String("#c77818"), 5.0);
+      d.line(985.0, 70.0, 985.0, 114.0, String("#73e2cb"), 5.0);
     }
     d.text(900.0, 136.0, app.load_name(state.active_load), 14.0, true, 0.0);
     var v = try spatial(state, false);

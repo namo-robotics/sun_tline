@@ -3,6 +3,49 @@ using std;
 /** Describes controls and translates semantic events into application operations. */
 public module controls {
 
+  /** Applies the studio palette to controls while preserving native focus and hover feedback. */
+  function style(element: ref ui.Element) void {
+    element.style.normal.foreground = 0xdce6f4;
+    element.style.normal.font = String("Sans");
+    element.style.normal.font_size = 14;
+    element.style.normal.border_width = 0;
+    element.style.normal.radius = 0;
+    if (element.container() or element.kind == ui.Kind.Drawing) {
+      element.style.normal.background = 0x0b1220;
+    }
+    if (element.kind == ui.Kind.Label) {
+      element.horizontal = ui.Align.Start;
+      element.style.normal.foreground = 0x91a3bc;
+      element.style.normal.font_size = 12;
+    }
+    if (element.kind == ui.Kind.Button or element.kind == ui.Kind.TextInput or
+      element.kind == ui.Kind.Select) {
+      element.style.normal.background = 0x23334b;
+      element.style.normal.foreground = 0xeaf2ff;
+      element.style.normal.padding = 8;
+      element.style.hover.background = 0x36516f;
+      element.style.focus.background = 0x405f80;
+      element.style.disabled.background = 0x1c2b3e;
+      element.style.disabled.foreground = 0x6c8098;
+    }
+    if (element.key.equals(ui.Key(1005)) or element.key.equals(ui.Key(1001))) {
+      element.style.normal.background = 0x152135;
+      element.style.normal.padding = 12;
+    }
+    if (element.key.equals(ui.Key(1000))) {
+      element.style.normal.padding = 12;
+    }
+    if (element.key.equals(ui.Key(1006))) {
+      element.style.normal.foreground = 0x73e2cb;
+    }
+    if (element.kind == ui.Kind.Button and (element.action == 1 or element.action == 8)) {
+      element.style.normal.background = 0x73e2cb;
+      element.style.normal.foreground = 0x082b2a;
+      element.style.hover.background = 0x98efdc;
+      element.style.focus.background = 0xb5f6e8;
+    }
+  }
+
   /** Appends a layout container and returns its parent index. */
   function box(view: ref ui.View, parent: i64, key: i64, kind: ui.Kind) i64 {
     var e = ui.Element(ui.Key(key), kind);
@@ -12,7 +55,7 @@ public module controls {
       e.expand_y = true;
     }
     if (key == 1000) {
-      e.margin = 12;
+      e.margin = 0;
     }
     return view.append(parent, e);
   }
@@ -104,7 +147,7 @@ public module controls {
     v.append(toolbar, check);
     var body = box(v, root, 1003, ui.Kind.Row);
     var scroll = ui.Element(ui.Key(1004), ui.Kind.Scroll);
-    scroll.width = 285;
+    scroll.width = 300;
     scroll.expand_y = true;
     var side = box(v, v.append(body, scroll), 1005, ui.Kind.Column);
     label(v, side, 1006, String("EXPERIMENT"));
@@ -151,6 +194,9 @@ public module controls {
         "Ideal lossless line: resistance absorbs energy; undamped circuits may keep oscillating. Sine drive remains periodic."
       )
     );
+    for (var element: ref ui.Element in v.elements) {
+      style(element);
+    }
     return v;
   }
 
