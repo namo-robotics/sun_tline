@@ -9,7 +9,7 @@ and current propagation, reflections, and settling on a lossless line.
 
 ## Install
 
-Download a package from the private [development releases](https://github.com/namo-robotics/sun_tline/releases):
+Download a package from the private [dev release](https://github.com/namo-robotics/sun_tline/releases/tag/dev):
 
 - **Apple Silicon macOS:** open the DMG and drag **Sun Tline.app** into **Applications**.
 - **Linux x86-64:** install the Debian package with `sudo apt install ./sun-tline_amd64.deb`.

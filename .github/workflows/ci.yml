@@ -92,9 +92,17 @@ jobs:
           COMMIT: ${{ github.sha }}
           RUN_NUMBER: ${{ github.run_number }}
         run: |
-          tag="dev-$RUN_NUMBER"
-          gh release create "$tag" --draft --repo "$REPOSITORY" --target "$COMMIT" --prerelease --title "Development build $RUN_NUMBER" --notes "Tested Linux x86-64 and Apple Silicon macOS packages. macOS app is ad-hoc signed."
-          find release -type f \( -name '*.deb' -o -name '*.dmg' -o -name '*.sha256' \) ! -name archive.sha256 -exec gh release upload "$tag" --repo "$REPOSITORY" {} +
+          tag=dev
+          if ! gh release view "$tag" --repo "$REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$tag" --draft --repo "$REPOSITORY" --target "$COMMIT" --prerelease --title "Development Build" --notes "Preparing tested packages."
+          fi
+          find release -type f \( -name '*.deb' -o -name '*.dmg' -o -name '*.sha256' \) ! -name archive.sha256 -exec gh release upload "$tag" --clobber --repo "$REPOSITORY" {} +
           tar -czf build-provenance.tar.gz release/linux/sun-version.txt release/macos/sun-version.txt release/linux/dependencies release/macos/dependencies release/macos/macos-native-files.tsv
-          gh release upload "$tag" --repo "$REPOSITORY" build-provenance.tar.gz
-          gh release edit "$tag" --repo "$REPOSITORY" --draft=false
+          gh release upload "$tag" --clobber --repo "$REPOSITORY" build-provenance.tar.gz
+          # Keep the rolling tag on the commit that produced the uploaded packages.
+          if gh api "repos/$REPOSITORY/git/ref/tags/$tag" >/dev/null 2>&1; then
+            gh api --method PATCH "repos/$REPOSITORY/git/refs/tags/$tag" -f "sha=$COMMIT" -F force=true
+          else
+            gh api --method POST "repos/$REPOSITORY/git/refs" -f "ref=refs/tags/$tag" -f "sha=$COMMIT"
+          fi
+          gh release edit "$tag" --repo "$REPOSITORY" --target "$COMMIT" --draft=false --prerelease --title "Development Build" --notes "Build $RUN_NUMBER from $COMMIT. Tested Linux x86-64 and Apple Silicon macOS packages. macOS app is ad-hoc signed."

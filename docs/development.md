@@ -117,8 +117,10 @@ with `sudo apt install ./build/sun-tline_amd64.deb` and launch **Sun Tline** fro
 desktop menu. The macOS DMG contains an app to drag into Applications. It is ad-hoc
 signed, not notarized; macOS may require approving it in Privacy & Security.
 
-CI validates both platforms, builds packages, and publishes a private numbered
-prerelease only when both platform jobs succeed. Pushes to `main` and manual
+CI validates both platforms, builds packages, and updates the same private `dev`
+prerelease only when both platform jobs succeed. Each successful publication
+replaces the package, checksum, and provenance assets and moves the `dev` tag
+to the tested commit. Pushes to `main` and manual
 runs of the **CI** workflow on `main` can publish a release. The DMG is mounted
 and its app copied to a fresh path, then checked for signatures, library
 relocation, and native GTK behavior with a clean environment before publication. No public package registry is used.
