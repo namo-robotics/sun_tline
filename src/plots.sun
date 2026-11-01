@@ -99,52 +99,9 @@ public module charts {
     return f.draw(1090.0, 300.0);
   }
 
-  /** Builds a bounded chronological terminal current trace using physical nanoseconds. */
-  function history(state: const ref app.State) SystemResult<ui_drawing.Drawing> {
-    var f = plot.Figure(
-      String("Terminal current history"),
-      String("Time (ns)"),
-      String("Current (A)")
-    );
-    var source = plot.Series(String("Source"), String("#176b87"), false);
-    var load = plot.Series(String("Load"), String("#c77818"), false);
-    var stride = state.history.size() / 512;
-    if (stride < 1) {
-      stride = 1;
-    }
-    for (var i: i64 = 0; i < state.history.size(); i += stride) {
-      var index = state.history_index(i);
-      source.add(
-        state.history[index].time * 1e9,
-        state.history[index].source_i
-      );
-      load.add(
-        state.history[index].time * 1e9,
-        state.history[index].load_i
-      );
-    }
-    var latest = state.simulation.sample();
-    source.add(latest.time * 1e9, latest.source_i);
-    load.add(latest.time * 1e9, latest.load_i);
-    var tolerance = state.current_scale * 0.001;
-    simplify(source, tolerance);
-    simplify(load, tolerance);
-    f.add(source);
-    f.add(load);
-    var start = state.history[state.history_index(0)].time * 1e9;
-    var end = state.simulation.time() * 1e9;
-    if (end < start + state.simulation.config.transit() * 1e9) {
-      end = start + state.simulation.config.transit() * 1e9;
-    }
-    f.x_limits = Option.Some(plot.Limits(start, end));
-    var scale = state.current_scale;
-    f.y_limits = Option.Some(plot.Limits(-scale, scale));
-    return f.draw(1090.0, 300.0);
-  }
-
-  /** Draws the source, two-conductor line, load, and three synchronized charts. */
+  /** Draws the source, two-conductor line, load, and two synchronized wave plots. */
   public function draw(state: const ref app.State) SystemResult<ui_drawing.Drawing> {
-    var d = ui_drawing.Drawing(1100.0, 1050.0);
+    var d = ui_drawing.Drawing(1100.0, 750.0);
     var ink = String("#176b87");
     d.text(30.0, 32.0, String("SUN TLINE  /  Lossless transmission line"), 23.0, false, 0.0);
     d.circle(65.0, 92.0, 22.0, String("#e4f2f5"));
@@ -176,10 +133,8 @@ public module charts {
     d.text(900.0, 136.0, app.load_name(state.active_load), 14.0, true, 0.0);
     var v = try spatial(state, false);
     var i = try spatial(state, true);
-    var it = try history(state);
     d.place(5.0, 150.0, v);
     d.place(5.0, 450.0, i);
-    d.place(5.0, 750.0, it);
     return SystemResult.Ok(d);
   }
 }

@@ -1,8 +1,8 @@
 # Sun Tline
 
 A desktop transmission-line simulator written in Sun using `sun_ui` and `sun_plot`.
-It shows forward and reflected voltage/current waves, source/load current history, and
-switch-on transients on an ideal lossless line.
+It shows forward and reflected voltage/current waves and switch-on transients
+on an ideal lossless line.
 
 ## Experiments
 
@@ -29,17 +29,16 @@ both edges fit on the line before reflection. Longer pulse widths are allowed;
 when the width exceeds the transit time, the leading edge reaches the load
 before the source switches off, initially resembling a step.
 
-Voltage and current wave plots each occupy a full row; terminal current history
-occupies the row below. Playback targets 60 frames per second with display-only subcell
-interpolation, while the numerical solver retains its fixed step.
+Voltage and current wave plots each occupy a full row. Playback targets 60 frames
+per second with display-only subcell interpolation, while the numerical solver
+retains its fixed step.
 
 **Traveling components** separates the forward/backward waves. Positive current
 points toward the load, so a backward voltage wave has negative current.
 Voltage limits cover at least −2× to +2× the source amplitude so reflections stay
 visible. Plot limits stay fixed until **Rescale** or a circuit reset; rescale if a trace
-moves outside the visible range. The history ring keeps approximately the most
-recent 32 line transits. A new circuit begins unenergized, with its source boundary
-launched at time zero.
+moves outside the visible range. A new circuit begins unenergized, with its source
+boundary launched at time zero.
 
 Resistance absorbs energy. Ideal reactive circuits can oscillate indefinitely;
 a resonantly driven ideal circuit can grow without settling. Sine excitation has

@@ -133,7 +133,7 @@ module desktop {
       try renderer.set_default_size(1100, 800);
       try paint(area, session.state);
       try await_paint(renderer, session, area);
-      // Exercise a full history buffer so frame timing includes the expensive steady workload.
+      // Measure repeated wave rendering after the initial transient.
       session.state.advance(512 * 40);
       session.state.running = true;
       var started = std.time.now();
@@ -145,7 +145,7 @@ module desktop {
       }
       var duration = started.elapsed();
       println(
-        `Full-history frame preparation: ${duration.as_secs_f64() * 1000.0 / 60.0} ms/frame`
+        `Wave frame preparation: ${duration.as_secs_f64() * 1000.0 / 60.0} ms/frame`
       );
       session.state.running = false;
       try await_paint(renderer, session, area);
