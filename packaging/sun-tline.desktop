@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Sun Tline
+Comment=Explore transmission-line waves and reflections
+Exec=sun_tline
+Icon=sun-tline
+Terminal=false
+Categories=Education;Science;Electronics;

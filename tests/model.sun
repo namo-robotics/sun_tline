@@ -1,0 +1,196 @@
+using std;
+
+/** Checks propagation and terminal physics independently of rendering. */
+module model_tests {
+
+  /** Carries assertion and circuit construction errors. */
+  enum TestResult<T> { Ok(T), Assertion(std.test.AssertionError), System(Error) }
+
+  /** Compares a physical measurement against an absolute tolerance. */
+  function near(actual: f64, expected: f64, tolerance: f64) TestResult<void> {
+    try std.test.assert(tline.absolute(actual - expected) < tolerance);
+    return TestResult.Ok;
+  }
+
+  /** Confirms the wave arrives after exactly one transit and a matched load absorbs it. */
+  test_function matched_arrival() TestResult<void> {
+    var c = tline.Config();
+    c.resistance = 50.0;
+    c.source_r = 50.0;
+    var s = try tline.Simulation(c);
+    s.advance(511);
+    try near(s.voltage(512), 0.0, 1e-12);
+    s.step();
+    try near(s.voltage(512), 0.5, 1e-12);
+    try near(s.minus(512), 0.0, 1e-12);
+    s.advance(2048);
+    try near(s.voltage(0), 0.5, 1e-12);
+    return TestResult.Ok;
+  }
+
+  /** Checks opposite voltage reflection signs at open and shorted ends. */
+  test_function open_and_short() TestResult<void> {
+    var c = tline.Config();
+    c.load = tline.Load.Open;
+    c.source_r = 50.0;
+    var s = try tline.Simulation(c);
+    s.advance(512);
+    try near(s.voltage(512), 1.0, 1e-12);
+    try near(s.current(512), 0.0, 1e-12);
+    var d = tline.Config();
+    d.load = tline.Load.Short;
+    d.source_r = 50.0;
+    var q = try tline.Simulation(d);
+    q.advance(512);
+    try near(q.voltage(512), 0.0, 1e-12);
+    try near(q.current(512), 0.02, 1e-12);
+    return TestResult.Ok;
+  }
+
+  /** Checks repeated reflections converge to the source/load voltage divider. */
+  test_function resistive_settling() TestResult<void> {
+    var s = try tline.Simulation(tline.Config());
+    s.advance(512 * 30);
+    try near(s.voltage(0), 0.8, 1e-10);
+    try near(s.voltage(512), 0.8, 1e-10);
+    try near(s.current(256), 0.008, 1e-10);
+    return TestResult.Ok;
+  }
+
+  /** Computes an independent exponential reference for modest negative arguments. */
+  function exponential(x: f64) f64 {
+    var term: f64 = 1.0;
+    var sum: f64 = 1.0;
+    for (var k: i64 = 1; k < 60; k += 1) {
+      term *= x / _convert<f64>(k);
+      sum += term;
+    }
+    return sum;
+  }
+
+  /** Compares capacitor and inductor step responses with their continuous exponential solutions. */
+  test_function reactive_analytical() TestResult<void> {
+    var c = tline.Config();
+    c.load = tline.Load.Capacitor;
+    c.source_r = 50.0;
+    var s = try tline.Simulation(c);
+    s.advance(1024);
+    var elapsed = (512.5) * s.dt;
+    try near(s.voltage(512), 1.0 - exponential(-elapsed / 50e-9), 2e-6);
+    var d = tline.Config();
+    d.load = tline.Load.Inductor;
+    d.source_r = 50.0;
+    var q = try tline.Simulation(d);
+    q.advance(1024);
+    try near(q.voltage(512), exponential(-elapsed / 50e-9), 2e-6);
+    return TestResult.Ok;
+  }
+
+  /** Checks a lossless round trip retains a pulse after its ideal source switches off. */
+  test_function undamped_energy() TestResult<void> {
+    var c = tline.Config();
+    c.source_r = 0.0;
+    c.load = tline.Load.Open;
+    c.wave = tline.Wave.Pulse;
+    c.pulse = 20e-9;
+    var s = try tline.Simulation(c);
+    s.advance(400);
+    var energy = s.energy();
+    s.advance(1024 * 20);
+    try near(s.energy(), energy, energy * 1e-10);
+    return TestResult.Ok;
+  }
+
+  /** Checks absorption removes passive line energy after a finite pulse. */
+  test_function passive_decay() TestResult<void> {
+    var c = tline.Config();
+    c.wave = tline.Wave.Pulse;
+    c.pulse = 20e-9;
+    var s = try tline.Simulation(c);
+    s.advance(512);
+    var energy = s.energy();
+    s.advance(512 * 20);
+    try std.test.assert(s.energy() < energy * 1e-12);
+    return TestResult.Ok;
+  }
+
+  /** Measures the same RLC endpoint with successive refinements. */
+  function rlc_value(cells: i64) SystemResult<f64> {
+    var c = tline.Config();
+    c.cells = cells;
+    c.load = tline.Load.RLC;
+    c.source_r = 50.0;
+    c.resistance = 5.0;
+    var s = try tline.Simulation(c);
+    s.advance(cells * 4);
+    return SystemResult.Ok(s.voltage(cells));
+  }
+
+  /** Ensures refinement improves the reactive boundary approximation. */
+  test_function rlc_convergence() TestResult<void> {
+    var low = try rlc_value(256);
+    var medium = try rlc_value(512);
+    var high = try rlc_value(1024);
+    var reference = try rlc_value(4096);
+    try std.test.assert(tline.absolute(medium - reference) < tline.absolute(low - reference));
+    try std.test.assert(tline.absolute(high - reference) < tline.absolute(medium - reference));
+    return TestResult.Ok;
+  }
+
+  /** Checks sine voltage and current phase against complex series-RLC impedance. */
+  test_function sine_impedance() TestResult<void> {
+    var c = tline.Config();
+    c.wave = tline.Wave.Sine;
+    c.load = tline.Load.RLC;
+    c.source_r = 50.0;
+    c.resistance = 30.0;
+    var s = try tline.Simulation(c);
+    s.advance(512 * 100);
+    var omega: f64 = 6.283185307179586 * 5e6;
+    var reactance = omega * 2.5e-6 - 1.0 / (omega * 1e-9);
+    var denominator = 80.0 * 80.0 + reactance * reactance;
+    for (var k: i64 = 0; k < 32; k += 1) {
+      s.advance(64);
+      var phase = omega * (s.time() - s.config.transit());
+      var sine = tline.sine(phase);
+      var cosine = tline.sine(phase + 1.5707963267948966);
+      var voltage = ((30.0 * 80.0 + reactance * reactance) * sine + 50.0 * reactance * cosine) /
+        denominator;
+      var current = (80.0 * sine - reactance * cosine) / denominator;
+      try near(s.voltage(512), voltage, 1e-5);
+      try near(s.current(512), current, 2e-7);
+    }
+    return TestResult.Ok;
+  }
+
+  /** Rejects malformed parameters and insufficient temporal resolution. */
+  test_function validation() TestResult<void> {
+    var c = tline.Config();
+    c.z = 0.0;
+    match c.validate() {
+      SystemResult.Ok => {
+        try std.test.assert(false);
+      },
+      SystemResult.Error(_) => {}
+    };
+    c.z = 50.0;
+    c.wave = tline.Wave.Sine;
+    c.frequency = 1e12;
+    match c.validate() {
+      SystemResult.Ok => {
+        try std.test.assert(false);
+      },
+      SystemResult.Error(_) => {}
+    };
+    c.wave = tline.Wave.Step;
+    c.load = tline.Load.Capacitor;
+    c.capacitance = 1e-20;
+    match c.validate() {
+      SystemResult.Ok => {
+        try std.test.assert(false);
+      },
+      SystemResult.Error(_) => {}
+    };
+    return TestResult.Ok;
+  }
+}

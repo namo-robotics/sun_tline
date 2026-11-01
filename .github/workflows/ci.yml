@@ -1,0 +1,85 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    container: ubuntu:26.04
+    steps:
+      - name: Install native build tools
+        run: |
+          apt-get update
+          apt-get install -y git curl ca-certificates build-essential pkg-config libgtk-4-dev librsvg2-dev xvfb xauth dbus-x11 dpkg-dev libfile-fcntllock-perl libfontconfig1 fonts-dejavu-core perl
+      - uses: actions/checkout@v4
+      - name: Install published compiler and bundles
+        run: |
+          mkdir -p tmp
+          curl -fL --retry 3 https://github.com/namo-robotics/sun/releases/download/dev/sun_0.dev_amd64.deb -o tmp/sun.deb
+          apt-get install -y ./tmp/sun.deb
+          ./scripts/install-dependencies.sh
+      - name: Format, build, and test
+        run: |
+          sun fmt --check src tests
+          xvfb-run -a dbus-run-session -- ./build.sh --all
+      - name: Package and smoke-test
+        run: ./scripts/package-linux.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: |
+            build/*.deb
+            build/*.sha256
+            build/sun-version.txt
+            build/dependencies/*/release.txt
+            build/dependencies/*/archive.sha256
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install published compiler and dependencies
+        run: |
+          test "$(uname -m)" = arm64
+          brew install namo-robotics/sun/sun gtk4 librsvg pkgconf coreutils
+          echo "PKG_CONFIG_PATH=$(brew --prefix libffi)/lib/pkgconfig:$(brew --prefix)/lib/pkgconfig" >> "$GITHUB_ENV"
+          ./scripts/install-dependencies.sh
+      - name: Build and test
+        run: ./build.sh --all
+      - name: Package and smoke-test
+        run: ./scripts/package-macos.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: |
+            build/*.dmg
+            build/*.sha256
+            build/sun-version.txt
+            build/macos-native-files.tsv
+            build/dependencies/*/release.txt
+            build/dependencies/*/archive.sha256
+  publish:
+    needs: [linux, macos]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+      - name: Publish tested private development release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT: ${{ github.sha }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          tag="dev-$RUN_NUMBER"
+          gh release create "$tag" --repo "$REPOSITORY" --target "$COMMIT" --prerelease --title "Development build $RUN_NUMBER" --notes "Tested Linux x86-64 and Apple Silicon macOS packages. macOS app is ad-hoc signed."
+          find release -type f \( -name '*.deb' -o -name '*.dmg' -o -name '*.sha256' \) ! -name archive.sha256 -exec gh release upload "$tag" --repo "$REPOSITORY" {} +
+          tar -czf build-provenance.tar.gz release/linux/sun-version.txt release/macos/sun-version.txt release/linux/dependencies release/macos/dependencies release/macos/macos-native-files.tsv
+          gh release upload "$tag" --repo "$REPOSITORY" build-provenance.tar.gz

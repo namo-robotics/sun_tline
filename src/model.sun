@@ -1,0 +1,285 @@
+using std;
+
+/** Simulates a lossless line and passive series terminations without platform dependencies. */
+public module tline {
+
+  /** Selects the termination across the line's two conductors. */
+  public enum Load { Open, Short, Resistor, Capacitor, Inductor, RC, RL, RLC }
+
+  /** Selects a source switched on at simulation time zero. */
+  public enum Wave { Step, Pulse, Sine }
+
+  /** Stores physical parameters in SI units and the numerical resolution. */
+  public class Config {
+    public var load: Load = Load.Resistor;
+    public var wave: Wave = Wave.Step;
+    public var amplitude: f64 = 1.0;
+    public var source_r: f64 = 25.0;
+    public var z: f64 = 50.0;
+    public var length: f64 = 10.0;
+    public var velocity: f64 = 200000000.0;
+    public var resistance: f64 = 100.0;
+    public var capacitance: f64 = 1e-9;
+    public var inductance: f64 = 2.5e-6;
+    public var pulse: f64 = 100e-9;
+    public var frequency: f64 = 5e6;
+    public var cells: i64 = 512;
+
+    /** Creates the initial demonstration circuit. */
+    init() {}
+
+    /** Returns the one-way propagation delay. */
+    public const method transit() f64 {
+      return this.length / this.velocity;
+    }
+
+    /** Reports whether the selected series circuit contains a capacitor. */
+    public const method has_c() bool {
+      return this.load == Load.Capacitor or this.load == Load.RC or this.load == Load.RLC;
+    }
+
+    /** Reports whether the selected series circuit contains an inductor. */
+    public const method has_l() bool {
+      return this.load == Load.Inductor or this.load == Load.RL or this.load == Load.RLC;
+    }
+
+    /** Returns resistance actually present in the selected load. */
+    public const method r() f64 {
+      return this.load == Load.Resistor or this.load == Load.RC or this.load == Load.RL or
+        this.load == Load.RLC ? this.resistance : 0.0;
+    }
+
+    /** Rejects invalid values and underresolved circuits before allocating buffers. */
+    public const method validate() SystemResult<void> {
+      if (not finite(this.amplitude) or not positive(this.z) or not positive(this.length) or
+        not positive(this.velocity) or not finite(this.source_r) or this.source_r < 0.0 or
+        not finite(this.resistance) or this.resistance < 0.0 or this.cells < 32 or
+        this.cells > 16384) {
+        return SystemResult.Error(
+          Error(
+            1,
+            "Use finite values, positive line parameters, nonnegative resistances, and 32–16384 cells."
+          )
+        );
+      }
+      var dt = this.transit() / _convert<f64>(this.cells);
+      if (not positive(dt) or not finite(2.0 * this.amplitude) or
+        not finite(this.amplitude / this.z) or not finite(this.source_r + this.z) or
+        not finite(this.r() + this.z)) {
+        return SystemResult.Error(
+          Error(1, "Circuit values exceed the supported numerical range.")
+        );
+      }
+      if ((this.has_c() and
+        (not positive(this.capacitance) or not positive((this.z + this.r()) * this.capacitance) or
+          dt * 20.0 > (this.z + this.r()) * this.capacitance)) or
+        (this.has_l() and
+          (not positive(this.inductance) or not positive(this.inductance / (this.z + this.r())) or
+            dt * 20.0 > this.inductance / (this.z + this.r()))) or
+        (this.wave == Wave.Sine and (not positive(this.frequency) or dt * this.frequency > 0.01)) or
+        (this.wave == Wave.Pulse and (not positive(this.pulse) or dt * 20.0 > this.pulse))) {
+        return SystemResult.Error(
+          Error(
+            1,
+            "Increase cells or slow the source/load: reactive time scales and pulses need 20 steps, sine periods 100 steps."
+          )
+        );
+      }
+      var rc = this.has_c() ? dt / (2.0 * this.capacitance) : 0.0;
+      var rl = this.has_l() ? 2.0 * this.inductance / dt : 0.0;
+      if (not finite(rc + rl + this.z + this.r())) {
+        return SystemResult.Error(
+          Error(1, "Reactive companion values exceed the numerical range.")
+        );
+      }
+      return SystemResult.Ok;
+    }
+
+    /** Evaluates the ideal source voltage at a physical time. */
+    public const method source(time: f64) f64 {
+      if (this.wave == Wave.Sine) {
+        return this.amplitude * sine(6.283185307179586 * this.frequency * time);
+      }
+      if (this.wave == Wave.Pulse and time >= this.pulse) {
+        return 0.0;
+      }
+      return this.amplitude;
+    }
+  }
+
+  /** Evaluates sine with range reduction and a convergent polynomial, entirely in Sun. */
+  public function sine(angle: f64) f64 {
+    var tau: f64 = 6.283185307179586;
+    var x = angle - _convert<f64>(_convert<i64>(angle / tau)) * tau;
+    if (x > 3.141592653589793) {
+      x -= tau;
+    }
+    if (x < -3.141592653589793) {
+      x += tau;
+    }
+    var term = x;
+    var result = x;
+    for (var n: i64 = 1; n < 14; n += 1) {
+      term *= -x * x / _convert<f64>((2 * n) * (2 * n + 1));
+      result += term;
+    }
+    return result;
+  }
+
+  /** Returns the magnitude of a floating-point value. */
+  public function absolute(value: f64) f64 {
+    return value < 0.0 ? -value : value;
+  }
+
+  /** Rejects infinities and NaNs without a platform-specific floating-point API. */
+  public function finite(value: f64) bool {
+    return value == value and value <= 1.7976931348623157e308 and value >= -1.7976931348623157e308;
+  }
+
+  /** Recognizes positive finite physical quantities. */
+  public function positive(value: f64) bool {
+    return finite(value) and value > 0.0;
+  }
+
+  /** Records a sampled source and load response for bounded plotting history. */
+  public class Sample {
+    public var time: f64;
+    public var source_v: f64;
+    public var load_v: f64;
+    public var source_i: f64;
+    public var load_i: f64;
+
+    /** Stores one simultaneous pair of terminal measurements. */
+    init(time: f64, sv: f64, lv: f64, si: f64, li: f64) {
+      this.time = time;
+      this.source_v = sv;
+      this.load_v = lv;
+      this.source_i = si;
+      this.load_i = li;
+    }
+  }
+
+  /** Owns fixed delay buffers and trapezoidal companion states; advancing allocates nothing. */
+  public class Simulation {
+    public var config: Config;
+    public var steps: i64 = 0;
+    public var dt: f64;
+    var forward: Vec<f64>;
+    var backward: Vec<f64>;
+    var fh: i64 = 0;
+    var bh: i64 = 0;
+    var vc: f64 = 0.0;
+    var vl: f64 = 0.0;
+    var il: f64 = 0.0;
+
+    /** Validates and owns a circuit, initially unenergized except for the launched source boundary. */
+    init(config: Config) SystemResult<void> {
+      try config.validate();
+      this.dt = config.transit() / _convert<f64>(config.cells);
+      var a = make_heap_allocator();
+      this.forward = Vec<f64>(a, config.cells + 1);
+      this.backward = Vec<f64>(a, config.cells + 1);
+      for (var i: i64 = 0; i <= config.cells; i += 1) {
+        this.forward.push(0.0);
+        this.backward.push(0.0);
+      }
+      this.forward[0] = config.source(0.0) * (config.z / (config.source_r + config.z));
+      this.config = config;
+    }
+
+    /** Returns simulation time independently of wall-clock animation. */
+    public const method time() f64 {
+      return _convert<f64>(this.steps) * this.dt;
+    }
+
+    /** Samples voltage traveling toward the load at one spatial cell. */
+    public const method plus(cell: i64) f64 {
+      return this.forward[(this.fh + cell) % this.forward.size()];
+    }
+
+    /** Samples voltage traveling toward the source at one spatial cell. */
+    public const method minus(cell: i64) f64 {
+      return this.backward[(this.bh + cell) % this.backward.size()];
+    }
+
+    /** Returns total line voltage at one spatial cell. */
+    public const method voltage(cell: i64) f64 {
+      return this.plus(cell) + this.minus(cell);
+    }
+
+    /** Returns current toward the load at one spatial cell. */
+    public const method current(cell: i64) f64 {
+      return (this.plus(cell) - this.minus(cell)) / this.config.z;
+    }
+
+    /** Solves the passive load boundary with trapezoidal capacitor and inductor companions. */
+    method reflect(incident: f64) f64 {
+      if (this.config.load == Load.Open) {
+        return incident;
+      }
+      if (this.config.load == Load.Short) {
+        return -incident;
+      }
+      var rc = this.config.has_c() ? this.dt / (2.0 * this.config.capacitance) : 0.0;
+      var rl = this.config.has_l() ? 2.0 * this.config.inductance / this.dt : 0.0;
+      var hc = this.config.has_c() ? this.vc + rc * this.il : 0.0;
+      var hl = this.config.has_l() ? -this.vl - rl * this.il : 0.0;
+      this.il = (2.0 * incident - hc - hl) / (this.config.z + this.config.r() + rc + rl);
+      this.vc = rc * this.il + hc;
+      this.vl = rl * this.il + hl;
+      return incident - this.config.z * this.il;
+    }
+
+    /** Advances exactly one cell transit, preserving both simultaneous boundary arrivals. */
+    public method step() void {
+      var incoming_source = this.minus(1);
+      var incoming_load = this.plus(this.config.cells - 1);
+      this.steps += 1;
+      var launch = this.config.source(this.time()) *
+        (this.config.z / (this.config.source_r + this.config.z)) +
+        ((this.config.source_r - this.config.z) / (this.config.source_r + this.config.z)) *
+          incoming_source;
+      var reflection = this.reflect(incoming_load);
+      var size = this.forward.size();
+      this.fh = (this.fh + size - 1) % size;
+      this.bh = (this.bh + 1) % size;
+      this.forward[this.fh] = launch;
+      this.backward[(this.bh + this.config.cells) % size] = reflection;
+    }
+
+    /** Advances a fixed number of steps, useful for deterministic tests and playback. */
+    public method advance(count: i64) void {
+      for (var i: i64 = 0; i < count; i += 1) {
+        this.step();
+      }
+    }
+
+    /** Captures terminal values without retaining a simulation borrow. */
+    public const method sample() Sample {
+      return Sample(
+        this.time(),
+        this.voltage(0),
+        this.voltage(this.config.cells),
+        this.current(0),
+        this.current(this.config.cells)
+      );
+    }
+
+    /** Integrates electromagnetic and reactive load energy using spatial trapezoidal weights. */
+    public const method energy() f64 {
+      var sum: f64 = 0.0;
+      for (var i: i64 = 0; i <= this.config.cells; i += 1) {
+        var weight = i == 0 or i == this.config.cells ? 0.5 : 1.0;
+        sum += weight * (this.plus(i) * this.plus(i) + this.minus(i) * this.minus(i)) * this.dt /
+          this.config.z;
+      }
+      if (this.config.has_c()) {
+        sum += 0.5 * this.config.capacitance * this.vc * this.vc;
+      }
+      if (this.config.has_l()) {
+        sum += 0.5 * this.config.inductance * this.il * this.il;
+      }
+      return sum;
+    }
+  }
+}

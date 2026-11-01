@@ -1,0 +1,15 @@
+/** Hosts headless simulation tests. */
+function main() i32 {
+  return 0;
+}
+manifest {
+  libraries: [
+    "stdlib.moon"
+  ], source_files: [
+    "../src/model.sun",
+    "../src/state.sun"
+  ], test_files: [
+    "model.sun",
+    "state.sun"
+  ]
+}

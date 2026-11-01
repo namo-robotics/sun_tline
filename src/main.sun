@@ -1,0 +1,168 @@
+using std;
+
+/** Hosts the simulator on GTK while keeping native ownership outside application state. */
+module desktop {
+
+  /** Replaces a drawing only after its SVG parses successfully. */
+  function paint(area: ref gtk.DrawingArea, state: const ref app.State) SystemResult<void> {
+    var drawing = try charts.draw(state);
+    var content = drawing.svg();
+    var document = try svg.Document(content);
+    area.set_document(document);
+    return SystemResult.Ok;
+  }
+
+  /** Polls until GTK paints or a bounded acceptance deadline expires. */
+  function await_paint(
+    renderer: ref ui_gtk.Renderer,
+    session: ref ui.Session<app.State>,
+    area: const ref gtk.DrawingArea
+  ) SystemResult<void> {
+    for (var i: i64 = 0; i < 200; i += 1) {
+      renderer.poll(session.tree, session.queue, false);
+      try session.dispatch(renderer);
+      if (area.rendered()) {
+        return SystemResult.Ok;
+      }
+      if (area.render_failed()) {
+        return SystemResult.Error(Error(1, "Drawing failed to paint"));
+      }
+      std.time.sleep(std.time.create_duration_millis(10));
+    }
+    return SystemResult.Error(Error(1, "Drawing paint timed out"));
+  }
+
+  /** Locates a toolbar action by its stable nested key path. */
+  function action(tree: const ref ui.Tree, key: i64) u64 {
+    var a = make_heap_allocator();
+    var path = Vec<ui.Key>(a, 3);
+    path.push(ui.Key(1000));
+    path.push(ui.Key(1001));
+    path.push(ui.Key(key));
+    return tree.identity_path(path);
+  }
+
+  /** Exercises real GTK button events before the numerical preset acceptance checks. */
+  function controls_test(
+    renderer: ref ui_gtk.Renderer,
+    session: ref ui.Session<app.State>
+  ) SystemResult<void> {
+    renderer.click(action(session.tree, 1));
+    renderer.poll(session.tree, session.queue, false);
+    try session.dispatch(renderer);
+    if (not session.state.running) {
+      return SystemResult.Error(Error(1, "Run button did not start playback"));
+    }
+    session.state.tick(0.05);
+    renderer.click(action(session.tree, 1));
+    renderer.poll(session.tree, session.queue, false);
+    try session.dispatch(renderer);
+    var steps = session.state.simulation.steps;
+    session.state.tick(0.05);
+    if (session.state.running or session.state.simulation.steps != steps) {
+      return SystemResult.Error(Error(1, "Pause did not preserve time"));
+    }
+    renderer.click(action(session.tree, 3));
+    renderer.poll(session.tree, session.queue, false);
+    try session.dispatch(renderer);
+    if (session.state.simulation.steps != steps + 1) {
+      return SystemResult.Error(Error(1, "Single step did not advance exactly once"));
+    }
+    renderer.click(action(session.tree, 2));
+    renderer.poll(session.tree, session.queue, false);
+    try session.dispatch(renderer);
+    if (session.state.simulation.steps != 0) {
+      return SystemResult.Error(Error(1, "Reset did not clear time"));
+    }
+    return SystemResult.Ok;
+  }
+
+  /** Runs interactive playback or a bounded native smoke test. */
+  public function run(automated: bool) SystemResult<void> {
+    var state = try app.State();
+    var title = String("Sun Tline — Transmission line simulator");
+    var renderer = try ui_gtk.Renderer(title, String("org.namo.sun_tline"));
+    try renderer.set_default_size(1350, 950);
+    var area = try gtk.DrawingArea();
+    try renderer.register_drawing(1, gtk.DrawingArea(area));
+    var session = ui.Session<app.State>(state, controls.view, controls.handle);
+    try paint(area, session.state);
+    try session.render(renderer);
+    if (automated) {
+      try controls_test(renderer, session);
+      try await_paint(renderer, session, area);
+      for (var p: i64 = 0; p < 8; p += 1) {
+        try session.state.preset(p);
+        session.state.advance(2048);
+        session.state.components = true;
+        try paint(area, session.state);
+        try session.render(renderer);
+        try await_paint(renderer, session, area);
+      }
+      try renderer.set_default_size(1100, 800);
+      try paint(area, session.state);
+      try await_paint(renderer, session, area);
+      var drawing = try charts.draw(session.state);
+      var path = String("build/acceptance.svg");
+      try drawing.save(path);
+      session.tree.shutdown(renderer);
+      try renderer.unregister_drawing(1);
+      if (renderer.creates != renderer.removals) {
+        return SystemResult.Error(Error(1, "Controls survived shutdown"));
+      }
+      println("Sun Tline GTK acceptance passed");
+      return SystemResult.Ok;
+    }
+    var previous = std.time.now();
+    var last_step = session.state.simulation.steps;
+    var last_revision = session.state.revision;
+    while (renderer.running()) {
+      renderer.poll(session.tree, session.queue, false);
+      try session.dispatch(renderer);
+      var now = std.time.now();
+      var elapsed = now.since(previous);
+      previous = now;
+      session.state.tick(elapsed.as_secs_f64());
+      if (session.state.simulation.steps != last_step or session.state.revision != last_revision) {
+        try paint(area, session.state);
+        try session.render(renderer);
+        last_step = session.state.simulation.steps;
+        last_revision = session.state.revision;
+      }
+      std.time.sleep(std.time.create_duration_millis(20));
+    }
+    session.tree.shutdown(renderer);
+    try renderer.unregister_drawing(1);
+    return SystemResult.Ok;
+  }
+}
+
+/** Selects the desktop application or its native acceptance mode. */
+function main(argc: i32, argv: raw_ptr<raw_ptr<i8>>) i32 {
+  var a = make_heap_allocator();
+  var env = std.env.Env(a);
+  var args = env.args(argc, argv);
+  return match desktop.run(args.size() == 2 and args[1].equals_literal("--self-test")) {
+    SystemResult.Ok => 0,
+    SystemResult.Error(error) => {
+      eprintln(error.message());
+      return 1;
+    }
+  };
+}
+manifest {
+  libraries: [
+    "stdlib.moon",
+    "sun_ui.moon",
+    "sun_plot.moon",
+    "sun_gobject.moon",
+    "sun_gtk.moon",
+    "sun_ui_gtk.moon"
+  ],
+  source_files: [
+    "model.sun",
+    "state.sun",
+    "plots.sun",
+    "view.sun"
+  ]
+}

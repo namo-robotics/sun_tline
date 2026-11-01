@@ -1,0 +1,138 @@
+using std;
+
+/** Converts simulation snapshots into vector plots without owning native resources. */
+public module charts {
+
+  /** Builds a spatial voltage or current plot with optional traveling components. */
+  function spatial(state: const ref app.State, current: bool) SystemResult<ui_drawing.Drawing> {
+    var f = plot.Figure(
+      String(current ? "Current along the line" : "Voltage along the line"),
+      String("Distance (m)"),
+      String(current ? "Current (A)" : "Voltage (V)")
+    );
+    var total = plot.Series(String("Total"), String("#176b87"), false);
+    var plus = plot.Series(String("Toward load"), String("#c77818"), false);
+    var minus = plot.Series(String("Toward source"), String("#9953a1"), false);
+    var cells = state.simulation.config.cells;
+    var stride = cells / 512;
+    if (stride < 1) {
+      stride = 1;
+    }
+    for (var i: i64 = 0; i <= cells; i += stride) {
+      var x = _convert<f64>(i) * state.simulation.config.length / _convert<f64>(cells);
+      var p = state.simulation.plus(i);
+      var m = state.simulation.minus(i);
+      if (current) {
+        p /= state.simulation.config.z;
+        m /= -state.simulation.config.z;
+      }
+      total.add(x, p + m);
+      plus.add(x, p);
+      minus.add(x, m);
+    }
+    // Include the exact load boundary even when display decimation does not divide the grid.
+    if (cells % stride != 0) {
+      var p = state.simulation.plus(cells);
+      var m = state.simulation.minus(cells);
+      if (current) {
+        p /= state.simulation.config.z;
+        m /= -state.simulation.config.z;
+      }
+      total.add(state.simulation.config.length, p + m);
+      plus.add(state.simulation.config.length, p);
+      minus.add(state.simulation.config.length, m);
+    }
+    f.add(total);
+    if (state.components) {
+      f.add(plus);
+      f.add(minus);
+    }
+    var scale = current ? state.current_scale : state.voltage_scale;
+    f.x_limits = Option.Some(plot.Limits(0.0, state.simulation.config.length));
+    f.y_limits = Option.Some(plot.Limits(-scale, scale));
+    return f.draw(540.0, 330.0);
+  }
+
+  /** Builds a bounded chronological terminal trace using physical nanoseconds. */
+  function history(state: const ref app.State, current: bool) SystemResult<ui_drawing.Drawing> {
+    var f = plot.Figure(
+      String(current ? "Terminal current history" : "Terminal voltage history"),
+      String("Time (ns)"),
+      String(current ? "Current (A)" : "Voltage (V)")
+    );
+    var source = plot.Series(String("Source"), String("#176b87"), false);
+    var load = plot.Series(String("Load"), String("#c77818"), false);
+    var stride = state.history.size() / 512;
+    if (stride < 1) {
+      stride = 1;
+    }
+    for (var i: i64 = 0; i < state.history.size(); i += stride) {
+      var index = state.history_index(i);
+      source.add(
+        state.history[index].time * 1e9,
+        current ? state.history[index].source_i : state.history[index].source_v
+      );
+      load.add(
+        state.history[index].time * 1e9,
+        current ? state.history[index].load_i : state.history[index].load_v
+      );
+    }
+    var latest = state.simulation.sample();
+    source.add(latest.time * 1e9, current ? latest.source_i : latest.source_v);
+    load.add(latest.time * 1e9, current ? latest.load_i : latest.load_v);
+    f.add(source);
+    f.add(load);
+    var start = state.history[state.history_index(0)].time * 1e9;
+    var end = state.simulation.time() * 1e9;
+    if (end < start + state.simulation.config.transit() * 1e9) {
+      end = start + state.simulation.config.transit() * 1e9;
+    }
+    f.x_limits = Option.Some(plot.Limits(start, end));
+    var scale = current ? state.current_scale : state.voltage_scale;
+    f.y_limits = Option.Some(plot.Limits(-scale, scale));
+    return f.draw(540.0, 330.0);
+  }
+
+  /** Draws the source, two-conductor line, load, and four synchronized charts. */
+  public function draw(state: const ref app.State) SystemResult<ui_drawing.Drawing> {
+    var d = ui_drawing.Drawing(1100.0, 820.0);
+    var ink = String("#176b87");
+    d.text(30.0, 32.0, String("SUN TLINE  /  Lossless transmission line"), 23.0, false, 0.0);
+    d.circle(65.0, 92.0, 22.0, String("#e4f2f5"));
+    d.text(65.0, 97.0, String("Vs"), 16.0, true, 0.0);
+    d.line(65.0, 70.0, 985.0, 70.0, ink, 2.0);
+    d.line(65.0, 114.0, 985.0, 114.0, ink, 2.0);
+    d.line(65.0, 70.0, 65.0, 76.0, ink, 2.0);
+    d.line(65.0, 108.0, 65.0, 114.0, ink, 2.0);
+    d.text(180.0, 61.0, `Rs = ${state.simulation.config.source_r} ohm`, 14.0, true, 0.0);
+    d.text(
+      510.0,
+      61.0,
+      `Z0 = ${state.simulation.config.z} ohm; length = ${state.simulation.config.length} m`,
+      14.0,
+      true,
+      0.0
+    );
+    d.text(
+      510.0,
+      97.0,
+      String("incident  →                       ←  reflected"),
+      16.0,
+      true,
+      0.0
+    );
+    if (state.active_load != 0) {
+      d.line(985.0, 70.0, 985.0, 114.0, String("#c77818"), 5.0);
+    }
+    d.text(900.0, 136.0, app.load_name(state.active_load), 14.0, true, 0.0);
+    var v = try spatial(state, false);
+    var i = try spatial(state, true);
+    var vt = try history(state, false);
+    var it = try history(state, true);
+    d.place(5.0, 150.0, v);
+    d.place(555.0, 150.0, i);
+    d.place(5.0, 480.0, vt);
+    d.place(555.0, 480.0, it);
+    return SystemResult.Ok(d);
+  }
+}

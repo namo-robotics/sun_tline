@@ -1,0 +1,387 @@
+using std;
+
+/** Owns editable settings and playback independently of native widgets. */
+public module app {
+
+  /** Provides descriptive names for the supported termination circuits. */
+  public function load_name(index: i64) String {
+    if (index == 0) {
+      return String("Open circuit");
+    }
+    if (index == 1) {
+      return String("Short circuit");
+    }
+    if (index == 2) {
+      return String("Resistor");
+    }
+    if (index == 3) {
+      return String("Capacitor");
+    }
+    if (index == 4) {
+      return String("Inductor");
+    }
+    if (index == 5) {
+      return String("Series RC");
+    }
+    if (index == 6) {
+      return String("Series RL");
+    }
+    return String("Series RLC");
+  }
+
+  /** Maps a validated choice to its physical load. */
+  public function load(index: i64) tline.Load {
+    if (index == 0) {
+      return tline.Load.Open;
+    }
+    if (index == 1) {
+      return tline.Load.Short;
+    }
+    if (index == 2) {
+      return tline.Load.Resistor;
+    }
+    if (index == 3) {
+      return tline.Load.Capacitor;
+    }
+    if (index == 4) {
+      return tline.Load.Inductor;
+    }
+    if (index == 5) {
+      return tline.Load.RC;
+    }
+    if (index == 6) {
+      return tline.Load.RL;
+    }
+    return tline.Load.RLC;
+  }
+
+  /** Names one source waveform. */
+  public function wave_name(index: i64) String {
+    return String(index == 0 ? "Step" : index == 1 ? "Pulse" : "Sine");
+  }
+
+  /** Names an educational preset. */
+  public function preset_name(index: i64) String {
+    if (index == 0) {
+      return String("Repeated reflections");
+    }
+    if (index == 1) {
+      return String("Matched line");
+    }
+    if (index == 2) {
+      return String("Open end");
+    }
+    if (index == 3) {
+      return String("Shorted end");
+    }
+    if (index == 4) {
+      return String("Capacitive charging");
+    }
+    if (index == 5) {
+      return String("Inductive response");
+    }
+    if (index == 6) {
+      return String("RLC ringing");
+    }
+    return String("Sine standing wave");
+  }
+
+  /** Keeps simulation state, draft text, and bounded history explicitly owned. */
+  public class State {
+    public var simulation: tline.Simulation;
+    public var fields: Vec<String>;
+    public var load_index: i64 = 2;
+    public var wave_index: i64 = 0;
+    public var preset_index: i64 = 0;
+    public var active_load: i64 = 2;
+    public var running: bool = false;
+    public var revision: i64 = 0;
+    public var components: bool = false;
+    public var speed: f64 = 1.0;
+    public var credit: f64 = 0.0;
+    public var voltage_scale: f64 = 1.2;
+    public var current_scale: f64 = 0.024;
+    public var message: String = String("Paused — choose a preset or press Run.");
+    public var history: Vec<tline.Sample>;
+    public var history_head: i64 = 0;
+
+    /** Creates a validated demonstration with preallocated history capacity. */
+    init() SystemResult<void> {
+      var a = make_heap_allocator();
+      this.simulation = try tline.Simulation(tline.Config());
+      this.fields = Vec<String>(a, 12);
+      this.history = Vec<tline.Sample>(a, 2048);
+      this.sync_fields();
+      this.record();
+    }
+
+    /** Rebuilds draft strings from the active physical configuration. */
+    public method sync_fields() void {
+      this.fields.clear();
+      this.fields.push(`${this.simulation.config.amplitude}`);
+      this.fields.push(`${this.simulation.config.source_r}`);
+      this.fields.push(`${this.simulation.config.z}`);
+      this.fields.push(`${this.simulation.config.length}`);
+      this.fields.push(`${this.simulation.config.velocity}`);
+      this.fields.push(`${this.simulation.config.resistance}`);
+      this.fields.push(`${this.simulation.config.capacitance}`);
+      this.fields.push(`${this.simulation.config.inductance}`);
+      this.fields.push(`${this.simulation.config.pulse}`);
+      this.fields.push(`${this.simulation.config.frequency}`);
+      this.fields.push(`${this.simulation.config.cells}`);
+    }
+
+    /** Reports which physical fields apply to the current draft circuit. */
+    public const method field_visible(index: i64) bool {
+      if (index == 5) {
+        return this.load_index == 2 or this.load_index >= 5;
+      }
+      if (index == 6) {
+        return this.load_index == 3 or this.load_index == 5 or this.load_index == 7;
+      }
+      if (index == 7) {
+        return this.load_index == 4 or this.load_index >= 6;
+      }
+      if (index == 8) {
+        return this.wave_index == 1;
+      }
+      if (index == 9) {
+        return this.wave_index == 2;
+      }
+      return true;
+    }
+
+    /** Parses the draft atomically; failure leaves the current experiment unchanged. */
+    public method configuration() SystemResult<tline.Config> {
+      var a = make_heap_allocator();
+      var values = Vec<f64>(a, 11);
+      for (var field_index: i64 = 0; field_index < this.fields.size(); field_index += 1) {
+        if (not this.field_visible(field_index)) {
+          var fallback = this.simulation.config.resistance;
+          if (field_index == 6) {
+            fallback = this.simulation.config.capacitance;
+          }
+          if (field_index == 7) {
+            fallback = this.simulation.config.inductance;
+          }
+          if (field_index == 8) {
+            fallback = this.simulation.config.pulse;
+          }
+          if (field_index == 9) {
+            fallback = this.simulation.config.frequency;
+          }
+          values.push(fallback);
+          continue;
+        }
+        match this.fields[field_index].parse_f64() {
+          Option.Some(value) => {
+            if (not tline.finite(value)) {
+              return SystemResult.Error(Error(1, "Every field must contain a finite number."));
+            }
+            values.push(value);
+          },
+          Option.None => {
+            return SystemResult.Error(
+              Error(1, "Every field must contain a number, optionally in scientific notation.")
+            );
+          }
+        };
+      }
+      if (values[10] < 32.0 or values[10] > 16384.0 or
+        values[10] != _convert<f64>(_convert<i64>(values[10]))) {
+        return SystemResult.Error(Error(1, "Cells must be an integer from 32 to 16384."));
+      }
+      var c = tline.Config();
+      c.load = load(this.load_index);
+      c.wave = this.wave_index == 0 ? tline.Wave.Step : this.wave_index == 1 ? tline.Wave.Pulse : tline.Wave.Sine;
+      c.amplitude = values[0];
+      c.source_r = values[1];
+      c.z = values[2];
+      c.length = values[3];
+      c.velocity = values[4];
+      c.resistance = values[5];
+      c.capacitance = values[6];
+      c.inductance = values[7];
+      c.pulse = values[8];
+      c.frequency = values[9];
+      c.cells = _convert<i64>(values[10]);
+      try c.validate();
+      return SystemResult.Ok(c);
+    }
+
+    /** Installs a valid circuit and resets playback and history. */
+    public method install(config: tline.Config) SystemResult<void> {
+      this.simulation = try tline.Simulation(config);
+      this.active_load = this.load_index;
+      this.running = false;
+      this.credit = 0.0;
+      this.history.clear();
+      this.history_head = 0;
+      this.record();
+      this.rescale();
+      this.message = String("Paused — circuit reset.");
+      return SystemResult.Ok;
+    }
+
+    /** Applies draft settings without destroying a valid run on input failure. */
+    public method apply() void {
+      match this.configuration() {
+        SystemResult.Ok(config) => {
+          ignore_error(this.install(config));
+        },
+        SystemResult.Error(error) => {
+          this.message = error.message();
+        }
+      };
+    }
+
+    /** Resets the active circuit while discarding uncommitted settings. */
+    public method reset() void {
+      this.sync_fields();
+      this.load_index = this.active_load;
+      this.wave_index = this.simulation.config.wave == tline.Wave.Step ? 0 : this.simulation.config.wave ==
+        tline.Wave.Pulse ? 1 : 2;
+      this.apply();
+    }
+
+    /** Selects and installs a complete demonstration circuit. */
+    public method preset(index: i64) SystemResult<void> {
+      var c = tline.Config();
+      this.load_index = 2;
+      this.wave_index = 0;
+      this.preset_index = index;
+      if (index == 1) {
+        c.source_r = 50.0;
+        c.resistance = 50.0;
+      }
+      if (index == 2 or index == 7) {
+        this.load_index = 0;
+        c.load = tline.Load.Open;
+        c.source_r = 50.0;
+      }
+      if (index == 3) {
+        this.load_index = 1;
+        c.load = tline.Load.Short;
+        c.source_r = 50.0;
+      }
+      if (index == 4) {
+        this.load_index = 3;
+        c.load = tline.Load.Capacitor;
+        c.source_r = 50.0;
+      }
+      if (index == 5) {
+        this.load_index = 4;
+        c.load = tline.Load.Inductor;
+        c.source_r = 50.0;
+      }
+      if (index == 6) {
+        this.load_index = 7;
+        c.load = tline.Load.RLC;
+        c.resistance = 5.0;
+        c.source_r = 10.0;
+      }
+      if (index == 7) {
+        this.wave_index = 2;
+        c.wave = tline.Wave.Sine;
+        c.frequency = 5e6;
+      }
+      try this.install(c);
+      this.sync_fields();
+      return SystemResult.Ok;
+    }
+
+    /** Stores terminal samples in a fixed-capacity ring. */
+    public method record() void {
+      var sample = this.simulation.sample();
+      if (this.history.size() < 2048) {
+        this.history.push(sample);
+      } else {
+        ignore_error(this.history.set(this.history_head, sample));
+        this.history_head = (this.history_head + 1) % 2048;
+      }
+    }
+
+    /** Resolves a chronological sample index in the history ring. */
+    public const method history_index(index: i64) i64 {
+      return (this.history_head + index) % this.history.size();
+    }
+
+    /** Advances exact steps and samples at a resolution-independent cadence. */
+    public method advance(count: i64) void {
+      var stride = this.simulation.config.cells / 64;
+      if (stride < 1) {
+        stride = 1;
+      }
+      for (var i: i64 = 0; i < count; i += 1) {
+        if (this.simulation.steps >= 1000000000000) {
+          this.running = false;
+          this.message = String("Time limit reached; reset to begin again.");
+          return;
+        }
+        this.simulation.step();
+        if (not tline.finite(this.simulation.voltage(0)) or
+          not tline.finite(this.simulation.voltage(this.simulation.config.cells))) {
+          this.running = false;
+          this.message = String(
+            "Numerical range exceeded; reduce excitation or reset the circuit."
+          );
+          return;
+        }
+        if (this.simulation.steps % stride == 0) {
+          this.record();
+        }
+      }
+    }
+
+    /** Converts elapsed animation time into bounded work without skipping simulation steps. */
+    public method tick(seconds: f64) void {
+      if (not this.running) {
+        return;
+      }
+      var elapsed = seconds > 0.1 ? 0.1 : seconds;
+      this.credit += elapsed * this.speed * _convert<f64>(this.simulation.config.cells);
+      var steps = _convert<i64>(this.credit);
+      if (steps > 256) {
+        steps = 256;
+        this.credit = 256.0;
+      }
+      this.credit -= _convert<f64>(steps);
+      this.advance(steps);
+    }
+
+    /** Chooses stable symmetric plot limits until the next explicit rescale or circuit reset. */
+    public method rescale() void {
+      var v = tline.absolute(this.simulation.config.amplitude);
+      if (v < 1e-12) {
+        v = 1.0;
+      }
+      var current = v / this.simulation.config.z;
+      for (var i: i64 = 0; i <= this.simulation.config.cells; i += 1) {
+        var sv = tline.absolute(this.simulation.voltage(i));
+        var si = tline.absolute(this.simulation.current(i));
+        if (sv > v) {
+          v = sv;
+        }
+        if (si > current) {
+          current = si;
+        }
+      }
+      for (var h: i64 = 0; h < this.history.size(); h += 1) {
+        if (tline.absolute(this.history[h].source_v) > v) {
+          v = tline.absolute(this.history[h].source_v);
+        }
+        if (tline.absolute(this.history[h].load_v) > v) {
+          v = tline.absolute(this.history[h].load_v);
+        }
+        if (tline.absolute(this.history[h].source_i) > current) {
+          current = tline.absolute(this.history[h].source_i);
+        }
+        if (tline.absolute(this.history[h].load_i) > current) {
+          current = tline.absolute(this.history[h].load_i);
+        }
+      }
+      this.voltage_scale = v * 1.2;
+      this.current_scale = current * 1.2;
+    }
+  }
+}

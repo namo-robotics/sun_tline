@@ -1,0 +1,78 @@
+using std;
+
+/** Exercises application behavior without a graphical dependency. */
+module state_tests {
+
+  /** Propagates assertions and simulation construction failures. */
+  enum TestResult<T> { Ok(T), Assertion(std.test.AssertionError), System(Error) }
+
+  /** Checks pausing, speed-independent physics, and reset semantics. */
+  test_function playback() TestResult<void> {
+    var a = try app.State();
+    var b = try app.State();
+    a.tick(0.1);
+    try std.test.assert_eq(a.simulation.steps, 0);
+    a.running = true;
+    b.running = true;
+    b.speed = 2.0;
+    for (var i: i64 = 0; i < 64; i += 1) {
+      a.tick(0.03125);
+      b.tick(0.015625);
+    }
+    try std.test.assert_eq(a.simulation.steps, b.simulation.steps);
+    for (var i: i64 = 0; i <= 512; i += 1) {
+      try std.test.assert_eq(a.simulation.voltage(i), b.simulation.voltage(i));
+    }
+    a.reset();
+    try std.test.assert_eq(a.simulation.steps, 0);
+    try std.test.assert(not a.running);
+    return TestResult.Ok;
+  }
+
+  /** Invalid drafts leave the existing circuit and time untouched. */
+  test_function atomic_settings() TestResult<void> {
+    var s = try app.State();
+    s.advance(50);
+    ignore_error(s.fields.set(2, String("invalid")));
+    s.apply();
+    try std.test.assert_eq(s.simulation.steps, 50);
+    try std.test.assert_eq(s.simulation.config.z, 50.0);
+    ignore_error(s.fields.set(2, String("75")));
+    s.apply();
+    try std.test.assert_eq(s.simulation.steps, 0);
+    try std.test.assert_eq(s.simulation.config.z, 75.0);
+    return TestResult.Ok;
+  }
+
+  /** An invalid hidden component field cannot block an unrelated circuit. */
+  test_function inactive_fields() TestResult<void> {
+    var s = try app.State();
+    ignore_error(s.fields.set(6, String("invalid capacitor")));
+    s.apply();
+    try std.test.assert_eq(s.simulation.config.z, 50.0);
+    s.load_index = 3;
+    s.advance(10);
+    s.apply();
+    try std.test.assert_eq(s.simulation.steps, 10);
+    return TestResult.Ok;
+  }
+
+  /** History wraps chronologically without growing; display changes preserve time. */
+  test_function history_and_presets() TestResult<void> {
+    var s = try app.State();
+    s.advance(512 * 40);
+    try std.test.assert_eq(s.history.size(), 2048);
+    var first = s.history[s.history_index(0)].time;
+    var last = s.history[s.history_index(2047)].time;
+    try std.test.assert(first > 0.0 and last > first);
+    var steps = s.simulation.steps;
+    s.components = true;
+    s.rescale();
+    try std.test.assert_eq(s.simulation.steps, steps);
+    for (var i: i64 = 0; i < 8; i += 1) {
+      try s.preset(i);
+      try std.test.assert_eq(s.simulation.steps, 0);
+    }
+    return TestResult.Ok;
+  }
+}
