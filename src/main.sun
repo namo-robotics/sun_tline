@@ -117,11 +117,45 @@ module desktop {
         Error(1, "Sine pulse did not propagate both lobes followed by zero")
       );
     }
+    // Numeric edits and load selections apply without a separate confirmation button.
+    ignore_error(path.set(4, ui.Key(100)));
+    var amplitude = String("2");
+    try renderer.edit(session.tree.identity_path(path), amplitude, 0);
+    renderer.poll(session.tree, session.queue, false);
+    try session.dispatch(renderer);
+    if (session.state.simulation.config.amplitude != 2.0 or session.state.simulation.steps != 0 or
+      session.state.running) {
+      return SystemResult.Error(Error(1, "Numeric edit did not automatically reset the circuit"));
+    }
+    session.state.advance(32);
+    var incomplete = String("-");
+    try renderer.edit(session.tree.identity_path(path), incomplete, 0);
+    renderer.poll(session.tree, session.queue, false);
+    try session.dispatch(renderer);
+    if (session.state.simulation.config.amplitude != 2.0 or session.state.simulation.steps != 32) {
+      return SystemResult.Error(Error(1, "Incomplete edit changed the active experiment"));
+    }
+    try renderer.edit(session.tree.identity_path(path), amplitude, 0);
+    renderer.poll(session.tree, session.queue, false);
+    try session.dispatch(renderer);
+    ignore_error(path.set(4, ui.Key(20)));
+    try renderer.edit(session.tree.identity_path(path), empty, 0);
+    renderer.poll(session.tree, session.queue, false);
+    try session.dispatch(renderer);
+    if (session.state.simulation.config.load != tline.Load.Open) {
+      return SystemResult.Error(Error(1, "Load selection did not automatically apply"));
+    }
+    // Restore the pulse snapshot used by the graphical export acceptance check.
+    try session.state.preset(0);
+    session.state.wave_index = 3;
+    session.state.apply();
+    session.state.advance(256);
     return SystemResult.Ok;
   }
 
   /** Runs interactive playback or a bounded native smoke test. */
   public function run(automated: bool) SystemResult<void> {
+    var frame_interval = 1.0 / 240.0;
     var state = try app.State();
     var title = String("Sun Tline — Transmission line simulator");
     var renderer = try ui_gtk.Renderer(title, String("org.namo.sun_tline"));
@@ -154,7 +188,7 @@ module desktop {
       session.state.running = true;
       var started = std.time.now();
       for (var frame: i64 = 0; frame < 60; frame += 1) {
-        session.state.tick(1.0 / 60.0);
+        session.state.tick(frame_interval);
         try paint(area, session.state);
         try session.render(renderer);
         renderer.poll(session.tree, session.queue, false);
@@ -178,6 +212,7 @@ module desktop {
     }
     var previous = std.time.now();
     var status_clock = std.time.now();
+    var frame_clock = std.time.now();
     var last_step = session.state.simulation.steps;
     var last_revision = session.state.revision;
     while (renderer.running()) {
@@ -187,8 +222,12 @@ module desktop {
       var elapsed = now.since(previous);
       previous = now;
       session.state.tick(elapsed.as_secs_f64());
-      if (session.state.running or session.state.simulation.steps != last_step or
+      var frame_elapsed = frame_clock.elapsed();
+      if ((session.state.running and area.rendered() and
+        frame_elapsed.as_secs_f64() >= frame_interval) or
+        (session.state.simulation.steps != last_step and not session.state.running) or
         session.state.revision != last_revision) {
+        frame_clock = std.time.now();
         try paint(area, session.state);
         var status_elapsed = status_clock.elapsed();
         if (not session.state.running or session.state.revision != last_revision or
@@ -199,11 +238,19 @@ module desktop {
         last_step = session.state.simulation.steps;
         last_revision = session.state.revision;
       }
-      // Account for drawing work rather than adding a fixed delay to every frame.
-      var work = previous.elapsed();
-      var remaining = 1.0 / 60.0 - work.as_secs_f64();
-      if (remaining > 0.0) {
-        std.time.sleep(std.time.create_duration_nanos(_convert<i64>(remaining * 1e9)));
+      // GTK must keep servicing input and its frame clock between wave updates.
+      // A blocking sleep here also stalls native scrolling, even while paused.
+      if (not session.state.running) {
+        try renderer.wait_events(session.tree, session.queue, 0);
+      } else {
+        var work = frame_clock.elapsed();
+        var remaining = frame_interval - work.as_secs_f64();
+        // Yield to GTK even when a missed deadline is waiting for native presentation.
+        var timeout: u32 = 1;
+        if (remaining > 0.0) {
+          timeout = _convert<u32>(remaining * 1000.0) + 1;
+        }
+        try renderer.wait_events(session.tree, session.queue, timeout);
       }
     }
     session.tree.shutdown(renderer);

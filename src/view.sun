@@ -42,7 +42,7 @@ public module controls {
     if (element.key.equals(ui.Key(1006))) {
       element.style.normal.foreground = 0x73e2cb;
     }
-    if (element.kind == ui.Kind.Button and (element.action == 1 or element.action == 8)) {
+    if (element.kind == ui.Kind.Button and element.action == 1) {
       element.style.normal.background = 0x73e2cb;
       element.style.normal.foreground = 0x082b2a;
       element.style.hover.background = 0x98efdc;
@@ -183,7 +183,6 @@ public module controls {
         v.append(side, input);
       }
     }
-    button(v, side, 8, String("Apply and reset"));
     var drawing = ui.Element(ui.Key(30), ui.Kind.Drawing);
     drawing.drawing_id = 1;
     drawing.expand_x = true;
@@ -235,12 +234,14 @@ public module controls {
     state.revision += 1;
     if (event.action >= 100 and event.action <= 110) {
       ignore_error(state.fields.set(event.action - 100, event.value.text.clone(a)));
+      state.apply();
     } else if (event.action >= 20 and event.action <= 22) {
       for (var i: i64 = 0; i < 8; i += 1) {
         var key = ui.Key(i);
         if (event.value.selection.equals(key)) {
           if (event.action == 20) {
             state.load_index = i;
+            state.apply();
           }
           if (event.action == 21 and i < 4) {
             state.wave_index = i;
@@ -276,8 +277,6 @@ public module controls {
       }
     } else if (event.action == 7) {
       state.components = event.value.boolean;
-    } else if (event.action == 8) {
-      state.apply();
     }
     return SystemResult.Ok;
   }

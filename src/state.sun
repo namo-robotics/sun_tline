@@ -365,7 +365,8 @@ public module app {
       if (cell == 0 or cell == this.simulation.config.cells) {
         return here;
       }
-      return here + this.credit * (this.simulation.plus(cell - 1) - here);
+      return here +
+        (this.credit < 1.0 ? this.credit : 0.0) * (this.simulation.plus(cell - 1) - here);
     }
 
     /** Interpolates backward propagation while preserving the solved terminal constraints. */
@@ -374,21 +375,22 @@ public module app {
       if (cell == 0 or cell == this.simulation.config.cells) {
         return here;
       }
-      return here + this.credit * (this.simulation.minus(cell + 1) - here);
+      return here +
+        (this.credit < 1.0 ? this.credit : 0.0) * (this.simulation.minus(cell + 1) - here);
     }
 
-    /** Converts elapsed animation time into bounded work without skipping simulation steps. */
+    /** Retains elapsed-time debt and drains bounded batches without dropping physics steps. */
     public method tick(seconds: f64) void {
-      if (not this.running) {
+      if (not this.running or not tline.finite(seconds) or seconds < 0.0) {
         return;
       }
-      var elapsed = seconds > 0.1 ? 0.1 : seconds;
-      this.credit += elapsed * this.speed * _convert<f64>(this.simulation.config.cells);
-      var steps = _convert<i64>(this.credit);
-      if (steps > 256) {
-        steps = 256;
-        this.credit = 256.0;
+      var pending = this.credit +
+        seconds * this.speed * _convert<f64>(this.simulation.config.cells);
+      if (not tline.finite(pending)) {
+        return;
       }
+      this.credit = pending;
+      var steps = this.credit >= 4096.0 ? 4096 : _convert<i64>(this.credit);
       this.credit -= _convert<f64>(steps);
       this.advance(steps);
     }

@@ -29,6 +29,33 @@ module state_tests {
     return TestResult.Ok;
   }
 
+  /** Delayed frames retain wall time and catch up through bounded batches at maximum settings. */
+  test_function delayed_playback() TestResult<void> {
+    var s = try app.State();
+    var c = tline.Config();
+    c.cells = 16384;
+    try s.install(c);
+    s.running = true;
+    s.speed = 8.0;
+    s.tick(0.25);
+    try std.test.assert_eq(s.simulation.steps, 4096);
+    try std.test.assert_eq(s.credit, 28672.0);
+    // A backlog must not extrapolate a fractional wave beyond adjacent cells.
+    try std.test.assert_eq(s.display_plus(4097), s.simulation.plus(4097));
+    for (var i: i64 = 0; i < 7; i += 1) {
+      s.tick(0.0);
+    }
+    try std.test.assert_eq(s.simulation.steps, 32768);
+    try std.test.assert_eq(s.credit, 0.0);
+    for (var i: i64 = 0; i < 240; i += 1) {
+      s.tick(1.0 / 240.0);
+    }
+    try std.test.assert(
+      tline.absolute(_convert<f64>(s.simulation.steps) + s.credit - 163840.0) < 1e-6
+    );
+    return TestResult.Ok;
+  }
+
   /** Fractional playback moves the visible wave while keeping numerical steps deterministic. */
   test_function fractional_wave_motion() TestResult<void> {
     var s = try app.State();

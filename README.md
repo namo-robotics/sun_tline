@@ -17,8 +17,8 @@ a step, a rectangular pulse, a single-cycle sine pulse, and continuous sine exci
 set their source resistance. Terminations are
 open, shorted, resistive, capacitive, inductive, or series RC/RL/RLC. Settings use
 SI units, including seconds, farads, and henries; scientific notation is accepted.
-Edit settings and press **Apply and reset**. Invalid settings leave the current
-experiment intact. **Reset** discards unapplied edits and restarts the active circuit.
+Valid settings edits apply automatically and reset playback to paused. Incomplete
+or invalid input leaves the current experiment intact and displays a validation message. **Reset** discards unapplied edits and restarts the active circuit.
 Selecting a preset immediately installs it and pauses playback. Selecting a source
 waveform applies the current settings and resets playback immediately; invalid
 settings leave the active simulation unchanged. The active waveform is shown
@@ -35,11 +35,14 @@ when the width exceeds the transit time, the leading edge reaches the load
 before the source switches off, initially resembling a step.
 
 The dark studio interface uses red voltage waves and green current waves.
-Voltage and current wave plots each occupy a full row. Playback targets 60 frames
+Voltage and current wave plots each occupy a full row. Playback targets 240 frames
 per second with display-only subcell interpolation, while the numerical solver
 retains its fixed step. Time and step readouts use stable, fixed-width fields
 and refresh at 10 Hz during playback; pausing or single-stepping updates them
-immediately.
+immediately. The event loop services native input and scrolling while waiting
+for the next wave update, including when simulation playback is paused. Actual
+presentation rate depends on the display refresh rate and rendering workload.
+A new wave document is prepared only after GTK has painted the previous one.
 
 **Traveling components** separates the forward/backward waves. Positive current
 points toward the load, so a backward voltage wave has negative current.
@@ -136,8 +139,9 @@ The default is 512 cells; 32–16384 are supported. Reactive time scales and pul
 widths must span at least 20 steps, and sine periods at least 100. Double resolution
 to check convergence. Abrupt step/pulse edges have the expected grid-time
 quantization, and narrow spatial details can be lost in the display's reduced
-sampling. Simulation work is bounded per frame and slows under load without
-skipping numerical steps. Long-running or overflowing experiments stop with a
+sampling. Simulation work is bounded per event-loop turn. Delayed updates retain pending
+physical time and catch up in batches without skipping numerical steps; sustained
+overload can still make playback fall behind wall time. Long-running or overflowing experiments stop with a
 message instead of displaying invalid values.
 
 Tests cover analytical resistive and reactive responses, RLC convergence, complex
