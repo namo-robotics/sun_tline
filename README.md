@@ -4,6 +4,18 @@ A desktop transmission-line simulator written in Sun using `sun_ui` and `sun_plo
 It shows forward and reflected voltage/current waves and switch-on transients
 on an ideal lossless line.
 
+## Install on macOS
+
+Download `sun-tline-arm64.dmg` from the latest successful private
+[development release](https://github.com/namo-robotics/sun_tline/releases).
+Sign in with an account that can access the repository. Open the disk image and
+drag **Sun Tline.app** into **Applications**. The Apple Silicon app includes its
+native libraries; users do not need Sun, GTK, or Homebrew installed.
+
+The app is ad-hoc signed, without notarization. For a trusted development build,
+macOS may require **System Settings → Privacy & Security → Open Anyway**.
+The app's minimum macOS version is the major version used by its CI build runner.
+
 ## Experiments
 
 Choose **Repeated reflections**, **Matched line**, **Open end**, **Shorted end**,
@@ -120,7 +132,10 @@ desktop menu. The macOS DMG contains an app to drag into Applications. It is ad-
 signed, not notarized; macOS may require approving it in Privacy & Security.
 
 CI validates both platforms, builds packages, and publishes a private numbered
-prerelease only when both platform jobs succeed. No public package registry is used.
+prerelease only when both platform jobs succeed. Pushes to `main` and manual
+runs of the **CI** workflow on `main` can publish a release. The DMG is mounted
+and its app copied to a fresh path, then checked for signatures, library
+relocation, and native GTK behavior with a clean environment before publication. No public package registry is used.
 
 ## Numerical model
 

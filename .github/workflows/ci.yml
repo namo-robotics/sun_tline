@@ -4,6 +4,9 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 permissions:
   contents: read
 jobs:
@@ -35,6 +38,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: linux
+          if-no-files-found: error
           path: |
             build/*.deb
             build/*.sha256
@@ -62,16 +66,18 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: macos
+          if-no-files-found: error
           path: |
             build/*.dmg
             build/*.sha256
             build/sun-version.txt
             build/macos-native-files.tsv
+            build/macos-app-acceptance.log
             build/dependencies/*/release.txt
             build/dependencies/*/archive.sha256
   publish:
     needs: [linux, macos]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -87,7 +93,8 @@ jobs:
           RUN_NUMBER: ${{ github.run_number }}
         run: |
           tag="dev-$RUN_NUMBER"
-          gh release create "$tag" --repo "$REPOSITORY" --target "$COMMIT" --prerelease --title "Development build $RUN_NUMBER" --notes "Tested Linux x86-64 and Apple Silicon macOS packages. macOS app is ad-hoc signed."
+          gh release create "$tag" --draft --repo "$REPOSITORY" --target "$COMMIT" --prerelease --title "Development build $RUN_NUMBER" --notes "Tested Linux x86-64 and Apple Silicon macOS packages. macOS app is ad-hoc signed."
           find release -type f \( -name '*.deb' -o -name '*.dmg' -o -name '*.sha256' \) ! -name archive.sha256 -exec gh release upload "$tag" --repo "$REPOSITORY" {} +
           tar -czf build-provenance.tar.gz release/linux/sun-version.txt release/macos/sun-version.txt release/linux/dependencies release/macos/dependencies release/macos/macos-native-files.tsv
           gh release upload "$tag" --repo "$REPOSITORY" build-provenance.tar.gz
+          gh release edit "$tag" --repo "$REPOSITORY" --draft=false
