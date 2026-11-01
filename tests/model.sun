@@ -49,11 +49,28 @@ module model_tests {
 
   /** Checks repeated reflections converge to the source/load voltage divider. */
   test_function resistive_settling() TestResult<void> {
-    var s = try tline.Simulation(tline.Config());
+    var c = tline.Config();
+    c.source_r = 25.0;
+    var s = try tline.Simulation(c);
     s.advance(512 * 30);
     try near(s.voltage(0), 0.8, 1e-10);
     try near(s.voltage(512), 0.8, 1e-10);
     try near(s.current(256), 0.008, 1e-10);
+    return TestResult.Ok;
+  }
+
+  /** Defaults to a stiff voltage source even while reflections return from the load. */
+  test_function ideal_source_default() TestResult<void> {
+    var c = tline.Config();
+    try std.test.assert_eq(c.source_r, 0.0);
+    var s = try tline.Simulation(c);
+    try near(s.plus(0), 1.0, 1e-12);
+    for (var step: i64 = 0; step < 48 * 512; step += 1) {
+      s.step();
+      try near(s.voltage(0), 1.0, 1e-12);
+    }
+    try near(s.voltage(512), 1.0, 1e-10);
+    try near(s.current(256), 0.01, 1e-10);
     return TestResult.Ok;
   }
 
@@ -104,6 +121,7 @@ module model_tests {
   /** Checks absorption removes passive line energy after a finite pulse. */
   test_function passive_decay() TestResult<void> {
     var c = tline.Config();
+    c.source_r = 25.0;
     c.wave = tline.Wave.Pulse;
     c.pulse = 20e-9;
     var s = try tline.Simulation(c);

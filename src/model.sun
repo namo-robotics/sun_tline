@@ -14,7 +14,7 @@ public module tline {
     public var load: Load = Load.Resistor;
     public var wave: Wave = Wave.Step;
     public var amplitude: f64 = 1.0;
-    public var source_r: f64 = 25.0;
+    public var source_r: f64 = 0.0;
     public var z: f64 = 50.0;
     public var length: f64 = 10.0;
     public var velocity: f64 = 200000000.0;

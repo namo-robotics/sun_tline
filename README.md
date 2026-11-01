@@ -1,7 +1,7 @@
 # Sun Tline
 
 A desktop transmission-line simulator written in Sun using `sun_ui` and `sun_plot`.
-It shows forward and reflected voltage/current waves, source/load histories, and
+It shows forward and reflected voltage/current waves, source/load current history, and
 switch-on transients on an ideal lossless line.
 
 ## Experiments
@@ -12,15 +12,17 @@ Press **Run**, pause at any time, or use **Single step** to advance one numerica
 Playback speed is measured in line transits per wall-clock second; physical time
 and transit time are shown below the plots.
 
-The source supports a step, a finite pulse, and sine excitation. Terminations are
+The source defaults to an ideal voltage source (0 Ω source resistance) and supports
+a step, a finite pulse, and sine excitation. Source matching presets explicitly
+set their source resistance. Terminations are
 open, shorted, resistive, capacitive, inductive, or series RC/RL/RLC. Settings use
 SI units, including seconds, farads, and henries; scientific notation is accepted.
 Edit settings and press **Apply and reset**. Invalid settings leave the current
 experiment intact. **Reset** discards unapplied edits and restarts the active circuit.
 Selecting a preset immediately installs it and pauses playback.
 
-Voltage and current wave plots each occupy a full row; terminal histories share
-the row below. Playback targets 60 frames per second with display-only subcell
+Voltage and current wave plots each occupy a full row; terminal current history
+occupies the row below. Playback targets 60 frames per second with display-only subcell
 interpolation, while the numerical solver retains its fixed step.
 
 **Traveling components** separates the forward/backward waves. Positive current
