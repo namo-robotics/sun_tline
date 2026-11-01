@@ -37,7 +37,9 @@ before the source switches off, initially resembling a step.
 The dark studio interface uses red voltage waves and green current waves.
 Voltage and current wave plots each occupy a full row. Playback targets 60 frames
 per second with display-only subcell interpolation, while the numerical solver
-retains its fixed step.
+retains its fixed step. Time and step readouts use stable, fixed-width fields
+and refresh at 10 Hz during playback; pausing or single-stepping updates them
+immediately.
 
 **Traveling components** separates the forward/backward waves. Positive current
 points toward the load, so a backward voltage wave has negative current.

@@ -55,6 +55,31 @@ public module app {
     return tline.Load.RLC;
   }
 
+  /** Formats physical time with stable decimal precision and a readable SI unit. */
+  public function time_label(seconds: f64) String {
+    var scale: f64 = 1e9;
+    var unit = String("ns");
+    if (seconds >= 1.0) {
+      scale = 1.0;
+      unit = String("s");
+    } else if (seconds >= 1e-3) {
+      scale = 1e3;
+      unit = String("ms");
+    } else if (seconds >= 1e-6) {
+      scale = 1e6;
+      unit = String("us");
+    }
+    if (not tline.finite(seconds) or seconds < 0.0 or seconds >= 1e12) {
+      return `${seconds} s`;
+    }
+    var rounded = _convert<i64>(seconds * scale * 1000.0 + 0.5);
+    var fraction = `${rounded % 1000}`;
+    while (fraction.length() < 3) {
+      fraction = `0${fraction}`;
+    }
+    return `${rounded / 1000}.${fraction} ${unit}`;
+  }
+
   /** Names one source waveform. */
   public function wave_name(index: i64) String {
     return String(index == 0 ? "Step" : index == 1 ? "Pulse" : index == 2 ? "Sine" : "Sine pulse");

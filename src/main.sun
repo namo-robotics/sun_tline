@@ -177,6 +177,7 @@ module desktop {
       return SystemResult.Ok;
     }
     var previous = std.time.now();
+    var status_clock = std.time.now();
     var last_step = session.state.simulation.steps;
     var last_revision = session.state.revision;
     while (renderer.running()) {
@@ -189,7 +190,12 @@ module desktop {
       if (session.state.running or session.state.simulation.steps != last_step or
         session.state.revision != last_revision) {
         try paint(area, session.state);
-        try session.render(renderer);
+        var status_elapsed = status_clock.elapsed();
+        if (not session.state.running or session.state.revision != last_revision or
+          status_elapsed.as_secs_f64() >= 0.1) {
+          try session.render(renderer);
+          status_clock = std.time.now();
+        }
         last_step = session.state.simulation.steps;
         last_revision = session.state.revision;
       }

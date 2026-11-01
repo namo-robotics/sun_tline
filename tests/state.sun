@@ -87,6 +87,17 @@ module state_tests {
     return TestResult.Ok;
   }
 
+  /** Removes binary floating-point tails and keeps a consistent precision across time units. */
+  test_function stable_time_readout() TestResult<void> {
+    try std.test.assert(app.time_label(301.26953124999994e-9).equals_literal("301.270 ns"));
+    try std.test.assert(app.time_label(50e-9).equals_literal("50.000 ns"));
+    try std.test.assert(app.time_label(0.0).equals_literal("0.000 ns"));
+    try std.test.assert(app.time_label(12.5e-6).equals_literal("12.500 us"));
+    try std.test.assert(app.time_label(12.5e-3).equals_literal("12.500 ms"));
+    try std.test.assert(app.time_label(1.25).equals_literal("1.250 s"));
+    return TestResult.Ok;
+  }
+
   /** Invalid drafts leave the existing circuit and time untouched. */
   test_function atomic_settings() TestResult<void> {
     var s = try app.State();

@@ -18,6 +18,10 @@ public module controls {
       element.style.normal.foreground = 0x91a3bc;
       element.style.normal.font_size = 12;
     }
+    if (element.key.equals(ui.Key(1013)) or element.key.equals(ui.Key(1014)) or
+      element.key.equals(ui.Key(1015)) or element.key.equals(ui.Key(1016))) {
+      element.style.normal.font = String("Monospace");
+    }
     if (element.kind == ui.Kind.Button or element.kind == ui.Kind.TextInput or
       element.kind == ui.Kind.Select) {
       element.style.normal.background = 0x23334b;
@@ -64,6 +68,17 @@ public module controls {
   function label(view: ref ui.View, parent: i64, key: i64, text: String) void {
     var e = ui.Element(ui.Key(key), ui.Kind.Label);
     e.text = text;
+    view.append(parent, e);
+  }
+
+  /** Reserves a stable horizontal slot so changing numeric text cannot move adjacent readouts. */
+  function readout(view: ref ui.View, parent: i64, key: i64, width: i32, text: String) void {
+    var e = ui.Element(ui.Key(key), ui.Kind.Label);
+    while (text.length() < _convert<i64>(width / 8)) {
+      text.append(" ");
+    }
+    e.text = text;
+    e.width = width;
     view.append(parent, e);
   }
 
@@ -178,18 +193,23 @@ public module controls {
     v.append(body, drawing);
     var active_wave = String("Step");
     if (state.simulation.config.wave == tline.Wave.Pulse) {
-      active_wave = `Pulse (${state.simulation.config.pulse * 1e9} ns)`;
+      active_wave = `Pulse (${app.time_label(state.simulation.config.pulse)})`;
     } else if (state.simulation.config.wave == tline.Wave.Sine) {
       active_wave = String("Sine");
     } else if (state.simulation.config.wave == tline.Wave.SinePulse) {
-      active_wave = `Sine pulse (${state.simulation.config.pulse * 1e9} ns, one cycle)`;
+      active_wave = `Sine pulse (${app.time_label(state.simulation.config.pulse)}, one cycle)`;
     }
-    label(
+    var status = box(v, root, 1009, ui.Kind.Row);
+    readout(v, status, 1013, 300, active_wave);
+    readout(v, status, 1014, 190, `t = ${app.time_label(state.simulation.time())}`);
+    readout(
       v,
-      root,
-      1009,
-      `${active_wave}     t = ${state.simulation.time() * 1e9} ns     transit = ${state.simulation.config.transit() * 1e9} ns     step = ${state.simulation.steps}`
+      status,
+      1015,
+      190,
+      `transit = ${app.time_label(state.simulation.config.transit())}`
     );
+    readout(v, status, 1016, 190, `step = ${state.simulation.steps}`);
     label(v, root, 1010, state.message.clone(a));
     label(
       v,
