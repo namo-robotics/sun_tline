@@ -22,10 +22,12 @@ jobs:
           curl -fL --retry 3 https://github.com/namo-robotics/sun/releases/download/dev/sun_0.dev_amd64.deb -o tmp/sun.deb
           apt-get install -y ./tmp/sun.deb
           ./scripts/install-dependencies.sh
-      - name: Format, build, and test
+      - name: Format and headless tests
         run: |
           sun fmt --check src tests
-          xvfb-run -a dbus-run-session -- ./build.sh --all
+          ./build.sh --test
+      - name: Build and GTK acceptance
+        run: xvfb-run -a dbus-run-session -- ./build.sh --self-test
       - name: Package and smoke-test
         run: ./scripts/package-linux.sh
       - uses: actions/upload-artifact@v4
@@ -47,8 +49,10 @@ jobs:
           brew install namo-robotics/sun/sun gtk4 librsvg pkgconf coreutils
           echo "PKG_CONFIG_PATH=$(brew --prefix libffi)/lib/pkgconfig:$(brew --prefix)/lib/pkgconfig" >> "$GITHUB_ENV"
           ./scripts/install-dependencies.sh
-      - name: Build and test
-        run: ./build.sh --all
+      - name: Headless tests
+        run: ./build.sh --test
+      - name: Build and GTK acceptance
+        run: ./build.sh --self-test
       - name: Package and smoke-test
         run: ./scripts/package-macos.sh
       - uses: actions/upload-artifact@v4
