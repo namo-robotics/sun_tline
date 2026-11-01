@@ -21,7 +21,7 @@ public module tline {
     public var resistance: f64 = 100.0;
     public var capacitance: f64 = 1e-9;
     public var inductance: f64 = 2.5e-6;
-    public var pulse: f64 = 100e-9;
+    public var pulse: f64 = 12.5e-9;
     public var frequency: f64 = 5e6;
     public var cells: i64 = 512;
 

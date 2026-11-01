@@ -74,6 +74,33 @@ module desktop {
     if (session.state.simulation.steps != 0) {
       return SystemResult.Error(Error(1, "Reset did not clear time"));
     }
+    var a = make_heap_allocator();
+    var path = Vec<ui.Key>(a, 5);
+    path.push(ui.Key(1000));
+    path.push(ui.Key(1003));
+    path.push(ui.Key(1004));
+    path.push(ui.Key(1005));
+    path.push(ui.Key(21));
+    var empty = String("");
+    try renderer.edit(session.tree.identity_path(path), empty, 1);
+    renderer.poll(session.tree, session.queue, false);
+    try session.dispatch(renderer);
+    if (session.state.simulation.config.wave != tline.Wave.Pulse or
+      session.state.simulation.steps != 0) {
+      return SystemResult.Error(
+        Error(1, "Pulse selection did not immediately reset the active waveform")
+      );
+    }
+    session.state.advance(256);
+    if (session.state.simulation.voltage(64) != 0.0 or
+      session.state.simulation.voltage(192) != 1.0 or session.state.simulation.voltage(320) != 0.0) {
+      return SystemResult.Error(
+        Error(
+          1,
+          "Pulse did not have distinct leading and trailing edges before reaching the load"
+        )
+      );
+    }
     return SystemResult.Ok;
   }
 
@@ -90,7 +117,11 @@ module desktop {
     try session.render(renderer);
     if (automated) {
       try controls_test(renderer, session);
+      try paint(area, session.state);
       try await_paint(renderer, session, area);
+      var pulse_drawing = try charts.draw(session.state);
+      var pulse_path = String("build/pulse-acceptance.svg");
+      try pulse_drawing.save(pulse_path);
       for (var p: i64 = 0; p < 8; p += 1) {
         try session.state.preset(p);
         session.state.advance(2048);

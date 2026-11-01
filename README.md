@@ -19,7 +19,15 @@ open, shorted, resistive, capacitive, inductive, or series RC/RL/RLC. Settings u
 SI units, including seconds, farads, and henries; scientific notation is accepted.
 Edit settings and press **Apply and reset**. Invalid settings leave the current
 experiment intact. **Reset** discards unapplied edits and restarts the active circuit.
-Selecting a preset immediately installs it and pauses playback.
+Selecting a preset immediately installs it and pauses playback. Selecting a source
+waveform applies the current settings and resets playback immediately; invalid
+settings leave the active simulation unchanged. The active waveform is shown
+beside the simulation time.
+
+The default pulse lasts 12.5 ns, a quarter of the default line transit time, so
+both edges fit on the line before reflection. Longer pulse widths are allowed;
+when the width exceeds the transit time, the leading edge reaches the load
+before the source switches off, initially resembling a step.
 
 Voltage and current wave plots each occupy a full row; terminal current history
 occupies the row below. Playback targets 60 frames per second with display-only subcell

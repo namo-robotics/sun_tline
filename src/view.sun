@@ -130,11 +130,17 @@ public module controls {
     drawing.min_width = 660;
     drawing.min_height = 490;
     v.append(body, drawing);
+    var active_wave = String("Step");
+    if (state.simulation.config.wave == tline.Wave.Pulse) {
+      active_wave = `Pulse (${state.simulation.config.pulse * 1e9} ns)`;
+    } else if (state.simulation.config.wave == tline.Wave.Sine) {
+      active_wave = String("Sine");
+    }
     label(
       v,
       root,
       1009,
-      `t = ${state.simulation.time() * 1e9} ns     transit = ${state.simulation.config.transit() * 1e9} ns     step = ${state.simulation.steps}`
+      `${active_wave}     t = ${state.simulation.time() * 1e9} ns     transit = ${state.simulation.config.transit() * 1e9} ns     step = ${state.simulation.steps}`
     );
     label(v, root, 1010, state.message.clone(a));
     label(
@@ -167,6 +173,7 @@ public module controls {
           }
           if (event.action == 21 and i < 3) {
             state.wave_index = i;
+            state.apply();
           }
           if (event.action == 22) {
             try state.preset(i);

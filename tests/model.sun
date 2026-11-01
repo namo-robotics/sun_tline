@@ -103,6 +103,21 @@ module model_tests {
     return TestResult.Ok;
   }
 
+  /** The default pulse switches off soon enough for both edges to fit on the line. */
+  test_function default_pulse_edges() TestResult<void> {
+    var c = tline.Config();
+    c.wave = tline.Wave.Pulse;
+    try std.test.assert(c.pulse < c.transit());
+    try near(c.source(c.pulse * 0.5), 1.0, 1e-12);
+    try near(c.source(c.pulse), 0.0, 1e-12);
+    var s = try tline.Simulation(c);
+    s.advance(256);
+    try near(s.voltage(64), 0.0, 1e-12);
+    try near(s.voltage(192), 1.0, 1e-12);
+    try near(s.voltage(320), 0.0, 1e-12);
+    return TestResult.Ok;
+  }
+
   /** Checks a lossless round trip retains a pulse after its ideal source switches off. */
   test_function undamped_energy() TestResult<void> {
     var c = tline.Config();
