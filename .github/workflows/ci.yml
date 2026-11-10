@@ -22,7 +22,7 @@ jobs:
       - name: Install native build tools
         run: |
           apt-get update
-          apt-get install -y git curl ca-certificates build-essential cmake ninja-build python3 pkg-config libgirepository1.0-dev gobject-introspection libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libx11-dev libxext-dev libgtk-4-dev librsvg2-dev xvfb xauth dbus-x11 dpkg-dev libfile-fcntllock-perl libfontconfig1 fonts-dejavu-core perl
+          apt-get install -y git curl ca-certificates build-essential clang cmake ninja-build python3 pkg-config libgirepository1.0-dev gobject-introspection libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libx11-dev libxext-dev libgtk-4-dev librsvg2-dev xvfb xauth dbus-x11 dpkg-dev libfile-fcntllock-perl libfontconfig1 fonts-dejavu-core perl
       - uses: actions/checkout@v4
       - name: Install compiler and build Git dependencies
         run: |

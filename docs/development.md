@@ -57,7 +57,7 @@ add artificial damping or automatically declare convergence.
 ## Build and test
 
 Supported release targets: Linux x86-64 and Apple Silicon macOS. Install a compatible
-published Sun compiler first. Linux needs Git, Python, CMake, Ninja, a C compiler,
+published Sun compiler first. Linux needs Git, Python, CMake, Ninja, Clang,
 GObject introspection metadata, GStreamer development libraries, X11/Xext
 development libraries, GTK4 development libraries, librsvg development libraries,
 `pkg-config`, Xvfb, xauth, D-Bus, and DejaVu fonts. macOS needs Homebrew `gtk4`,
