@@ -19,7 +19,7 @@ module build_targets {
     }
   }
 
-  /** Selects a named local entry with explicit paths and a binary or library type. */
+  /** Selects a local product and derives the build script outputs from its name. */
   function select(document: ref Json, name: static_ptr<u8>) JsonResult<Target> {
     var a = make_heap_allocator();
     var entries = try document.get("entrypoints");
@@ -28,17 +28,17 @@ module build_targets {
       var entry_name = try (try entry.get("name")).as_string();
       if (entry_name.equals_literal(name)) {
         var source = try (try entry.get("path")).as_string();
-        var output = try (try entry.get("output_name")).as_string();
+        var output = String("build/");
+        output.append(entry_name);
         var kind = try (try entry.get("type")).as_string();
         if (kind.equals_literal("library") == false and kind.equals_literal("binary") == false) {
           return JsonResult.Error(JsonError("Expected a binary or library entrypoint", -1));
         }
+        if (kind.equals_literal("library")) {
+          output.append(".moon");
+        }
         var tests = output.clone(a);
         tests.append("_test");
-        tests = match entry.get("test_binary_name") {
-          JsonResult.Ok(value) => (try value.as_string()).clone(a),
-          JsonResult.Error(_) => tests.clone(a)
-        };
         return JsonResult.Ok(
           Target(source.clone(a), output.clone(a), tests, kind.equals_literal("library"))
         );

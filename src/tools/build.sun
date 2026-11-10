@@ -99,7 +99,7 @@ module build_tasks {
       return test("plot-tests");
     }
     if (mode.equals_literal("--test")) {
-      return test("tests");
+      return test("tline-tests");
     }
     if (not mode.equals_literal("--build") and not mode.equals_literal("--all") and
       not mode.equals_literal("--self-test")) {
@@ -109,7 +109,7 @@ module build_tasks {
     }
     try compile("sun_tline", true);
     if (mode.equals_literal("--all")) {
-      try test("tests");
+      try test("tline-tests");
       try test("plot-tests");
     }
     if (mode.equals_literal("--all") or mode.equals_literal("--self-test")) {

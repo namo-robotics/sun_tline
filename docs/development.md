@@ -82,6 +82,10 @@ Dependencies, download checksums, and producer compiler versions live in
 `build/dependencies/`; the consumer compiler version is in `build/sun-version.txt`.
 Build products and native acceptance SVGs are in `build/`.
 
+`sun-config.json` names the products `sun_tline`, `tline-tests`, `tline-build`,
+and `plot-tests`. The build script derives its `build/<name>` output paths from
+these names; direct `sun build` commands use Sun's standard build directories.
+
 ### Required drawing support
 
 This application requires `ui.Kind.Drawing`, `Element.drawing_id`, and the GTK

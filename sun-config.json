@@ -7,28 +7,22 @@
     {
       "name": "sun_tline",
       "path": "src/main.sun",
-      "type": "binary",
-      "output_name": "build/sun_tline"
+      "type": "binary"
     },
     {
-      "name": "tests",
+      "name": "tline-tests",
       "path": "tests/main.sun",
-      "type": "binary",
-      "output_name": "build/tline-tests",
-      "test_binary_name": "build/tline-tests_test"
+      "type": "binary"
     },
     {
-      "name": "build-tool",
+      "name": "tline-build",
       "path": "src/tools/build.sun",
-      "type": "binary",
-      "output_name": "build/tline-build"
+      "type": "binary"
     },
     {
       "name": "plot-tests",
       "path": "tests/plots/main.sun",
-      "type": "binary",
-      "output_name": "build/plot-tests",
-      "test_binary_name": "build/plot-tests_test"
+      "type": "binary"
     }
   ]
 }
