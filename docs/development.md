@@ -97,6 +97,9 @@ both dependency setup and application builds.
 The `build.sh` wrapper queries `sun describe` for their actual output paths and
 copies the GUI executable to `build/sun_tline` for packaging and manual use.
 The application requires the drawing APIs from the selected `sun_ui` revision.
+Its manifest loads GTK types through `sun_ui_gtk.moon`. Do not also import the
+direct `sun_gobject` Moon libraries there: the renderer's transitive build can
+resolve to a different cache path, creating distinct GTK type instances.
 Legacy `SUN_UI_BUILD`, `SUN_GOBJECT_BUILD`, `SUN_UI_RELEASE`, and
 `SUN_GOBJECT_RELEASE` overrides are no longer used.
 
