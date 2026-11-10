@@ -1,3 +1,3 @@
-The named-target configuration reader in src/tools/targets.sun is adapted from
+Earlier versions included a named-target configuration reader adapted from
 sun_video_editor. Its upstream license is retained in packaging/licenses/sun-video-editor.txt.
 Dependencies retain their own licenses; package scripts include those notices.

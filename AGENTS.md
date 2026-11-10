@@ -10,8 +10,9 @@ outputs in `build/`. Limit parallel compilation to at most half the available co
 Document every module, type, function, method, and constructor with a `/** ... */` block.
 Keep allocations explicit and preserve ownership and memory safety.
 
-Dependencies are published bundles installed by `scripts/install-dependencies.sh`.
-`SUN_UI_BUILD` and `SUN_GOBJECT_BUILD` explicitly override their build directories.
-Never automatically import, modify, or build dependency checkouts. Do not publish
+Dependencies are Git packages selected in `sun-config.json` and built with the
+application's compiler by `scripts/install-dependencies.sh`. Install their system
+requirements first with `sun dep install --config sun-config.json --yes`.
+Sun manages cached checkouts; never edit the cache or import sibling checkouts. Do not publish
 upstream changes, create issues or pull requests, or change Git history without an
 explicit user request. Preserve unrelated working-tree changes.

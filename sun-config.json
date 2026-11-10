@@ -1,28 +1,77 @@
 {
   "root": true,
-  "sun_path": [
-    "build"
-  ],
   "entrypoints": [
     {
       "name": "sun_tline",
       "path": "src/main.sun",
-      "type": "binary"
+      "type": "binary",
+      "export": false,
+      "compile_args": [
+        "--dynamic",
+        "-L${namo-robotics/sun_gobject}/lib/native",
+        "-lsun_gobject_native",
+        "-lm"
+      ],
+      "pkg_config": [
+        "gtk4",
+        "librsvg-2.0"
+      ]
     },
     {
       "name": "tline-tests",
       "path": "tests/main.sun",
-      "type": "binary"
-    },
-    {
-      "name": "tline-build",
-      "path": "src/tools/build.sun",
-      "type": "binary"
+      "type": "binary",
+      "export": false,
+      "compile_args": [
+        "--dynamic"
+      ]
     },
     {
       "name": "plot-tests",
       "path": "tests/plots/main.sun",
-      "type": "binary"
+      "type": "binary",
+      "export": false,
+      "compile_args": [
+        "--dynamic"
+      ]
+    }
+  ],
+  "package_id": "namo-robotics/sun_tline",
+  "dependencies": [
+    {
+      "type": "git",
+      "url": "git@github.com:namo-robotics/sun_ui.git",
+      "version": "main",
+      "packages": {
+        "namo-robotics/sun_ui": {
+          "entrypoints": [
+            "sun_ui",
+            "sun_plot",
+            "sun_ui_gtk"
+          ]
+        }
+      },
+      "supported_targets": [
+        "x86_64-linux-gnu",
+        "arm64-apple-darwin"
+      ]
+    },
+    {
+      "type": "git",
+      "url": "git@github.com:namo-robotics/sun_gobject.git",
+      "version": "main",
+      "packages": {
+        "namo-robotics/sun_gobject": {
+          "entrypoints": [
+            "sun_gobject",
+            "sun_gtk"
+          ]
+        }
+      },
+      "supported_targets": [
+        "x86_64-linux-gnu",
+        "arm64-apple-darwin"
+      ]
     }
   ]
 }

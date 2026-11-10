@@ -57,11 +57,16 @@ add artificial damping or automatically declare convergence.
 ## Build and test
 
 Supported release targets: Linux x86-64 and Apple Silicon macOS. Install a compatible
-published Sun compiler first. Linux needs GTK4 development libraries, librsvg runtime,
+published Sun compiler first. Linux needs Git, Python, CMake, Ninja, a C compiler,
+GObject introspection metadata, GStreamer development libraries, X11/Xext
+development libraries, GTK4 development libraries, librsvg development libraries,
 `pkg-config`, Xvfb, xauth, D-Bus, and DejaVu fonts. macOS needs Homebrew `gtk4`,
-`librsvg`, `pkgconf`, and `coreutils`.
+`librsvg`, `pkgconf`, `coreutils`, `cmake`, `ninja`, `python`,
+`gobject-introspection`, and `gstreamer`.
+`sun dep install` installs additional requirements declared by Git dependencies.
 
 ```sh
+sun dep install --config sun-config.json --yes
 ./scripts/install-dependencies.sh
 ./build.sh --test                 # Sun-only physics and state tests
 ./build.sh --plot-test            # Curve accuracy; needs sun_ui/sun_plot, no display
@@ -76,34 +81,24 @@ xvfb-run -a dbus-run-session -- ./build.sh --all
 sun fmt --check src tests
 ```
 
-The default dependency installer downloads published `dev` bundles, never sources.
-`SUN_UI_RELEASE` and `SUN_GOBJECT_RELEASE` can select another published release.
-Dependencies, download checksums, and producer compiler versions live in
-`build/dependencies/`; the consumer compiler version is in `build/sun-version.txt`.
-Build products and native acceptance SVGs are in `build/`.
+The dependency installer resolves the Git packages in `sun-config.json` and builds
+`sun_ui`, `sun_plot`, the GTK adapter, and `sun_gobject` with the application's
+compiler. Sun manages source checkouts and generated bindings under `.sun/`.
+Dependencies use SSH URLs and `main`; CI rewrites GitHub SSH URLs to HTTPS.
+Set a dependency's `version` to a branch, tag, or commit to select another revision.
+Use `sun build --refresh-sources` to refresh cached revisions explicitly.
 
-`sun-config.json` names the products `sun_tline`, `tline-tests`, `tline-build`,
-and `plot-tests`. The build script derives its `build/<name>` output paths from
-these names; direct `sun build` commands use Sun's standard build directories.
+Dependency resolution records and licenses live in `build/dependencies/`;
+the compiler version is recorded in `build/sun-version.txt`. CI retains these
+records with the packaged artifacts. `SUN_EXECUTABLE` selects the compiler for
+both dependency setup and application builds.
 
-### Required drawing support
-
-This application requires `ui.Kind.Drawing`, `Element.drawing_id`, and the GTK
-renderer drawing registration API, plus retained `gtk.DrawingArea`/`gtk.Widget`
-ownership. These changes were prepared in the adjacent `sun_ui` and `sun_gobject`
-repositories. **Published dependency releases must include these APIs before CI
-and release publication can succeed.** Older bundles fail compilation; there is
-no automatic source-build fallback.
-
-For development against explicitly built local dependencies:
-
-```sh
-SUN_UI_BUILD=../sun_ui/build \
-SUN_GOBJECT_BUILD=../sun_gobject/build ./build.sh --build
-```
-
-The application never builds or changes those checkouts. Follow each dependency's
-own build instructions and use compatible compiler bundles.
+`sun-config.json` declares the named products and native linking requirements.
+The `build.sh` wrapper queries `sun describe` for their actual output paths and
+copies the GUI executable to `build/sun_tline` for packaging and manual use.
+The application requires the drawing APIs from the selected `sun_ui` revision.
+Legacy `SUN_UI_BUILD`, `SUN_GOBJECT_BUILD`, `SUN_UI_RELEASE`, and
+`SUN_GOBJECT_RELEASE` overrides are no longer used.
 
 ## Packages
 

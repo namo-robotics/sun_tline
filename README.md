@@ -18,9 +18,10 @@ The macOS app is ad-hoc signed; trusted builds may require **Privacy & Security 
 
 ## Build from source
 
-Install Sun, GTK4, librsvg, and `pkg-config`, then run:
+Install Sun and the native build tools listed in the development guide, then run:
 
 ```sh
+sun dep install --config sun-config.json --yes
 ./scripts/install-dependencies.sh
 ./build.sh --all
 ./build/sun_tline
