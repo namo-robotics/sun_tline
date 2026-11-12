@@ -181,11 +181,11 @@ public module tline {
       try config.validate();
       this.dt = config.transit() / _convert<f64>(config.cells);
       var a = make_heap_allocator();
-      this.forward = Vec<f64>(a, config.cells + 1);
-      this.backward = Vec<f64>(a, config.cells + 1);
+      this.forward = try Vec<f64>(a, config.cells + 1);
+      this.backward = try Vec<f64>(a, config.cells + 1);
       for (var i: i64 = 0; i <= config.cells; i += 1) {
-        this.forward.push(0.0);
-        this.backward.push(0.0);
+        try this.forward.push(0.0);
+        try this.backward.push(0.0);
       }
       this.forward[0] = config.source(0.0) * (config.z / (config.source_r + config.z));
       this.config = config;

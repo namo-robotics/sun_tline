@@ -3,17 +3,14 @@ using std;
 /** Checks propagation and terminal physics independently of rendering. */
 module model_tests {
 
-  /** Carries assertion and circuit construction errors. */
-  enum TestResult<T> { Ok(T), Assertion(std.test.AssertionError), System(Error) }
-
   /** Compares a physical measurement against an absolute tolerance. */
-  function near(actual: f64, expected: f64, tolerance: f64) TestResult<void> {
+  function near(actual: f64, expected: f64, tolerance: f64) std.test.AssertionResult<void> {
     try std.test.assert(tline.absolute(actual - expected) < tolerance);
-    return TestResult.Ok;
+    return std.test.AssertionResult.Ok;
   }
 
   /** Confirms the wave arrives after exactly one transit and a matched load absorbs it. */
-  test_function matched_arrival() TestResult<void> {
+  test_function matched_arrival() std.test.AssertionResult<void> {
     var c = tline.Config();
     c.resistance = 50.0;
     c.source_r = 50.0;
@@ -25,11 +22,11 @@ module model_tests {
     try near(s.minus(512), 0.0, 1e-12);
     s.advance(2048);
     try near(s.voltage(0), 0.5, 1e-12);
-    return TestResult.Ok;
+    return std.test.AssertionResult.Ok;
   }
 
   /** Checks opposite voltage reflection signs at open and shorted ends. */
-  test_function open_and_short() TestResult<void> {
+  test_function open_and_short() std.test.AssertionResult<void> {
     var c = tline.Config();
     c.load = tline.Load.Open;
     c.source_r = 50.0;
@@ -44,11 +41,11 @@ module model_tests {
     q.advance(512);
     try near(q.voltage(512), 0.0, 1e-12);
     try near(q.current(512), 0.02, 1e-12);
-    return TestResult.Ok;
+    return std.test.AssertionResult.Ok;
   }
 
   /** Checks repeated reflections converge to the source/load voltage divider. */
-  test_function resistive_settling() TestResult<void> {
+  test_function resistive_settling() std.test.AssertionResult<void> {
     var c = tline.Config();
     c.source_r = 25.0;
     var s = try tline.Simulation(c);
@@ -56,11 +53,11 @@ module model_tests {
     try near(s.voltage(0), 0.8, 1e-10);
     try near(s.voltage(512), 0.8, 1e-10);
     try near(s.current(256), 0.008, 1e-10);
-    return TestResult.Ok;
+    return std.test.AssertionResult.Ok;
   }
 
   /** Defaults to a stiff voltage source even while reflections return from the load. */
-  test_function ideal_source_default() TestResult<void> {
+  test_function ideal_source_default() std.test.AssertionResult<void> {
     var c = tline.Config();
     try std.test.assert_eq(c.source_r, 0.0);
     var s = try tline.Simulation(c);
@@ -71,7 +68,7 @@ module model_tests {
     }
     try near(s.voltage(512), 1.0, 1e-10);
     try near(s.current(256), 0.01, 1e-10);
-    return TestResult.Ok;
+    return std.test.AssertionResult.Ok;
   }
 
   /** Computes an independent exponential reference for modest negative arguments. */
@@ -86,7 +83,7 @@ module model_tests {
   }
 
   /** Compares capacitor and inductor step responses with their continuous exponential solutions. */
-  test_function reactive_analytical() TestResult<void> {
+  test_function reactive_analytical() std.test.AssertionResult<void> {
     var c = tline.Config();
     c.load = tline.Load.Capacitor;
     c.source_r = 50.0;
@@ -100,11 +97,11 @@ module model_tests {
     var q = try tline.Simulation(d);
     q.advance(1024);
     try near(q.voltage(512), exponential(-elapsed / 50e-9), 2e-6);
-    return TestResult.Ok;
+    return std.test.AssertionResult.Ok;
   }
 
   /** The default pulse switches off soon enough for both edges to fit on the line. */
-  test_function default_pulse_edges() TestResult<void> {
+  test_function default_pulse_edges() std.test.AssertionResult<void> {
     var c = tline.Config();
     c.wave = tline.Wave.Pulse;
     try std.test.assert(c.pulse < c.transit());
@@ -115,11 +112,11 @@ module model_tests {
     try near(s.voltage(64), 0.0, 1e-12);
     try near(s.voltage(192), 1.0, 1e-12);
     try near(s.voltage(320), 0.0, 1e-12);
-    return TestResult.Ok;
+    return std.test.AssertionResult.Ok;
   }
 
   /** A sine pulse contains one complete cycle and is exactly off after its width. */
-  test_function sine_pulse_shape_and_propagation() TestResult<void> {
+  test_function sine_pulse_shape_and_propagation() std.test.AssertionResult<void> {
     var c = tline.Config();
     c.wave = tline.Wave.SinePulse;
     try c.validate();
@@ -136,11 +133,11 @@ module model_tests {
     try near(s.voltage(64), 0.0, 1e-12);
     s.advance(512 * 48);
     try near(s.voltage(256), 0.0, 1e-10);
-    return TestResult.Ok;
+    return std.test.AssertionResult.Ok;
   }
 
   /** Rejects sine pulses too short to resolve a complete cycle. */
-  test_function sine_pulse_resolution() TestResult<void> {
+  test_function sine_pulse_resolution() std.test.AssertionResult<void> {
     var c = tline.Config();
     c.wave = tline.Wave.SinePulse;
     c.pulse = 1e-9;
@@ -148,20 +145,38 @@ module model_tests {
       SystemResult.Ok => {
         try std.test.assert(false);
       },
-      SystemResult.Error(_) => {}
+      SystemResult.Error(_) => {},
+      SystemResult.Allocation(error) => {
+        return std.test.AssertionResult.Allocation(error);
+      },
+      SystemResult.InvalidArgument(error) => {
+        return std.test.AssertionResult.InvalidArgument(error);
+      },
+      SystemResult.Overflow(error) => {
+        return std.test.AssertionResult.Overflow(error);
+      }
     };
     c.pulse = 0.0;
     match c.validate() {
       SystemResult.Ok => {
         try std.test.assert(false);
       },
-      SystemResult.Error(_) => {}
+      SystemResult.Error(_) => {},
+      SystemResult.Allocation(error) => {
+        return std.test.AssertionResult.Allocation(error);
+      },
+      SystemResult.InvalidArgument(error) => {
+        return std.test.AssertionResult.InvalidArgument(error);
+      },
+      SystemResult.Overflow(error) => {
+        return std.test.AssertionResult.Overflow(error);
+      }
     };
-    return TestResult.Ok;
+    return std.test.AssertionResult.Ok;
   }
 
   /** Checks a lossless round trip retains a pulse after its ideal source switches off. */
-  test_function undamped_energy() TestResult<void> {
+  test_function undamped_energy() std.test.AssertionResult<void> {
     var c = tline.Config();
     c.source_r = 0.0;
     c.load = tline.Load.Open;
@@ -172,11 +187,11 @@ module model_tests {
     var energy = s.energy();
     s.advance(1024 * 20);
     try near(s.energy(), energy, energy * 1e-10);
-    return TestResult.Ok;
+    return std.test.AssertionResult.Ok;
   }
 
   /** Checks absorption removes passive line energy after a finite pulse. */
-  test_function passive_decay() TestResult<void> {
+  test_function passive_decay() std.test.AssertionResult<void> {
     var c = tline.Config();
     c.source_r = 25.0;
     c.wave = tline.Wave.Pulse;
@@ -186,7 +201,7 @@ module model_tests {
     var energy = s.energy();
     s.advance(512 * 20);
     try std.test.assert(s.energy() < energy * 1e-12);
-    return TestResult.Ok;
+    return std.test.AssertionResult.Ok;
   }
 
   /** Measures the same RLC endpoint with successive refinements. */
@@ -202,18 +217,18 @@ module model_tests {
   }
 
   /** Ensures refinement improves the reactive boundary approximation. */
-  test_function rlc_convergence() TestResult<void> {
+  test_function rlc_convergence() std.test.AssertionResult<void> {
     var low = try rlc_value(256);
     var medium = try rlc_value(512);
     var high = try rlc_value(1024);
     var reference = try rlc_value(4096);
     try std.test.assert(tline.absolute(medium - reference) < tline.absolute(low - reference));
     try std.test.assert(tline.absolute(high - reference) < tline.absolute(medium - reference));
-    return TestResult.Ok;
+    return std.test.AssertionResult.Ok;
   }
 
   /** Checks sine voltage and current phase against complex series-RLC impedance. */
-  test_function sine_impedance() TestResult<void> {
+  test_function sine_impedance() std.test.AssertionResult<void> {
     var c = tline.Config();
     c.wave = tline.Wave.Sine;
     c.load = tline.Load.RLC;
@@ -235,18 +250,27 @@ module model_tests {
       try near(s.voltage(512), voltage, 1e-5);
       try near(s.current(512), current, 2e-7);
     }
-    return TestResult.Ok;
+    return std.test.AssertionResult.Ok;
   }
 
   /** Rejects malformed parameters and insufficient temporal resolution. */
-  test_function validation() TestResult<void> {
+  test_function validation() std.test.AssertionResult<void> {
     var c = tline.Config();
     c.z = 0.0;
     match c.validate() {
       SystemResult.Ok => {
         try std.test.assert(false);
       },
-      SystemResult.Error(_) => {}
+      SystemResult.Error(_) => {},
+      SystemResult.Allocation(error) => {
+        return std.test.AssertionResult.Allocation(error);
+      },
+      SystemResult.InvalidArgument(error) => {
+        return std.test.AssertionResult.InvalidArgument(error);
+      },
+      SystemResult.Overflow(error) => {
+        return std.test.AssertionResult.Overflow(error);
+      }
     };
     c.z = 50.0;
     c.wave = tline.Wave.Sine;
@@ -255,7 +279,16 @@ module model_tests {
       SystemResult.Ok => {
         try std.test.assert(false);
       },
-      SystemResult.Error(_) => {}
+      SystemResult.Error(_) => {},
+      SystemResult.Allocation(error) => {
+        return std.test.AssertionResult.Allocation(error);
+      },
+      SystemResult.InvalidArgument(error) => {
+        return std.test.AssertionResult.InvalidArgument(error);
+      },
+      SystemResult.Overflow(error) => {
+        return std.test.AssertionResult.Overflow(error);
+      }
     };
     c.wave = tline.Wave.Step;
     c.load = tline.Load.Capacitor;
@@ -264,8 +297,17 @@ module model_tests {
       SystemResult.Ok => {
         try std.test.assert(false);
       },
-      SystemResult.Error(_) => {}
+      SystemResult.Error(_) => {},
+      SystemResult.Allocation(error) => {
+        return std.test.AssertionResult.Allocation(error);
+      },
+      SystemResult.InvalidArgument(error) => {
+        return std.test.AssertionResult.InvalidArgument(error);
+      },
+      SystemResult.Overflow(error) => {
+        return std.test.AssertionResult.Overflow(error);
+      }
     };
-    return TestResult.Ok;
+    return std.test.AssertionResult.Ok;
   }
 }

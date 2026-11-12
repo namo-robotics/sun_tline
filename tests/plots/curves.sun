@@ -3,9 +3,6 @@ using std;
 /** Verifies visual reduction against all original samples, including sharp wave fronts. */
 public module charts {
 
-  /** Carries assertion failures through the test runner. */
-  enum CurveResult<T> { Ok(T), Assertion(std.test.AssertionError) }
-
   /** Produces either a sharp pulse or a smooth wave as an independent reference. */
   function reference(index: i64, pulse: bool) f64 {
     if (pulse) {
@@ -15,12 +12,16 @@ public module charts {
   }
 
   /** Checks every original point against the simplified curve and preserves endpoints. */
-  function verify(pulse: bool) CurveResult<void> {
-    var series = plot.Series(String("Reference"), String("blue"), false);
+  function verify(pulse: bool) std.test.AssertionResult<void> {
+    var series = try plot.Series(
+      try String("Reference"),
+      try String("blue"),
+      false
+    );
     for (var i: i64 = 0; i <= 1000; i += 1) {
       series.add(_convert<f64>(i), reference(i, pulse));
     }
-    simplify(series, 0.001);
+    try simplify(series, 0.001);
     try std.test.assert(series.points.size() < 500);
     try std.test.assert_eq(series.points[0].x, 0.0);
     try std.test.assert_eq(series.points[series.points.size() - 1].x, 1000.0);
@@ -36,16 +37,16 @@ public module charts {
         fraction * (series.points[segment + 1].y - series.points[segment].y);
       try std.test.assert(tline.absolute(y - reference(i, pulse)) <= 0.001000001);
     }
-    return CurveResult.Ok;
+    return std.test.AssertionResult.Ok;
   }
 
   /** Keeps a sine wave within the requested visual error after reducing SVG work. */
-  test_function smooth_curve_accuracy() CurveResult<void> {
+  test_function smooth_curve_accuracy() std.test.AssertionResult<void> {
     return verify(false);
   }
 
   /** Preserves the height and position of a sharp pulse's leading and trailing fronts. */
-  test_function sharp_front_accuracy() CurveResult<void> {
+  test_function sharp_front_accuracy() std.test.AssertionResult<void> {
     return verify(true);
   }
 }

@@ -4,16 +4,16 @@ using std;
 public module charts {
 
   /** Removes visually redundant samples while bounding vertical error at every original sample. */
-  function simplify(series: ref plot.Series, tolerance: f64) void {
+  function simplify(series: ref plot.Series, tolerance: f64) AllocationResult<void> {
     if (series.points.size() < 3) {
-      return;
+      return AllocationResult.Ok;
     }
     var a = make_heap_allocator();
-    var reduced = Vec<plot.Point>(a, series.points.size());
+    var reduced = try Vec<plot.Point>(a, series.points.size());
     var anchor: i64 = 0;
     var lower: f64 = -1e300;
     var upper: f64 = 1e300;
-    reduced.push(plot.Point(series.points[0].x, series.points[0].y));
+    try reduced.push(plot.Point(series.points[0].x, series.points[0].y));
     for (var index: i64 = 1; index < series.points.size(); index += 1) {
       var dx = series.points[index].x - series.points[anchor].x;
       var dy = series.points[index].y - series.points[anchor].y;
@@ -23,7 +23,8 @@ public module charts {
       var slope = dy / dx;
       if (slope < lower or slope > upper) {
         anchor = index - 1;
-        reduced.push(plot.Point(series.points[anchor].x, series.points[anchor].y));
+        try reduced.push(plot.Point(series.points[anchor].x, series.points[anchor].y));
+
         lower = -1e300;
         upper = 1e300;
         dx = series.points[index].x - series.points[anchor].x;
@@ -41,22 +42,33 @@ public module charts {
       }
     }
     var end = series.points.size() - 1;
-    reduced.push(plot.Point(series.points[end].x, series.points[end].y));
+    try reduced.push(plot.Point(series.points[end].x, series.points[end].y));
+
     series.points = reduced;
+
+    return AllocationResult.Ok;
   }
 
   /** Builds a spatial voltage or current plot with optional traveling components. */
   function spatial(state: const ref app.State, current: bool) SystemResult<ui_drawing.Drawing> {
-    var f = plot.Figure(
-      String(current ? "Current along the line" : "Voltage along the line"),
-      String("Distance (m)"),
-      String(current ? "Current (A)" : "Voltage (V)")
+    var f = try plot.Figure(
+      try String(current ? "Current along the line" : "Voltage along the line"),
+      try String("Distance (m)"),
+      try String(current ? "Current (A)" : "Voltage (V)")
     );
-    var total = plot.Series(String("Total"), String(current ? "#49df9b" : "#ff646e"), false);
-    var plus = plot.Series(String("Toward load"), String(current ? "#b2f1ca" : "#ffb0b6"), false);
-    var minus = plot.Series(
-      String("Toward source"),
-      String(current ? "#239e70" : "#ca4058"),
+    var total = try plot.Series(
+      try String("Total"),
+      try String(current ? "#49df9b" : "#ff646e"),
+      false
+    );
+    var plus = try plot.Series(
+      try String("Toward load"),
+      try String(current ? "#b2f1ca" : "#ffb0b6"),
+      false
+    );
+    var minus = try plot.Series(
+      try String("Toward source"),
+      try String(current ? "#239e70" : "#ca4058"),
       false
     );
     total.line_width = 2.6;
@@ -92,9 +104,9 @@ public module charts {
       minus.add(state.simulation.config.length, m);
     }
     var tolerance = (current ? state.current_scale : state.voltage_scale) * 0.001;
-    simplify(total, tolerance);
-    simplify(plus, tolerance);
-    simplify(minus, tolerance);
+    try simplify(total, tolerance);
+    try simplify(plus, tolerance);
+    try simplify(minus, tolerance);
     f.add(total);
     if (state.components) {
       f.add(plus);
@@ -109,7 +121,7 @@ public module charts {
   /** Applies the application palette to the toolkit's fixed SVG chrome for display and export alike. */
   public function document(state: const ref app.State) SystemResult<String> {
     var drawing = try draw(state);
-    var content = drawing.svg();
+    var content = try drawing.svg();
     // Match only complete paint attributes; waveform colors and user labels are untouched.
     content.replace("fill=\"white\"", "fill=\"#0b1220\"");
     content.replace("fill=\"#202735\"", "fill=\"#dce6f4\"");
@@ -120,20 +132,34 @@ public module charts {
 
   /** Draws the source, two-conductor line, load, and two synchronized wave plots. */
   public function draw(state: const ref app.State) SystemResult<ui_drawing.Drawing> {
-    var d = ui_drawing.Drawing(1100.0, 750.0);
-    var ink = String("#91a3bc");
-    d.text(30.0, 32.0, String("SUN TLINE  /  Lossless transmission line"), 23.0, false, 0.0);
-    d.circle(65.0, 92.0, 22.0, String("#23334b"));
-    d.text(65.0, 97.0, String("Vs"), 16.0, true, 0.0);
-    d.line(65.0, 70.0, 985.0, 70.0, ink, 2.0);
-    d.line(65.0, 114.0, 985.0, 114.0, ink, 2.0);
-    d.line(65.0, 70.0, 65.0, 76.0, ink, 2.0);
-    d.line(65.0, 108.0, 65.0, 114.0, ink, 2.0);
-    d.text(180.0, 61.0, `Rs = ${state.simulation.config.source_r} ohm`, 14.0, true, 0.0);
+    var d = try ui_drawing.Drawing(1100.0, 750.0);
+    var ink = try String("#91a3bc");
+    d.text(
+      30.0,
+      32.0,
+      try String("SUN TLINE  /  Lossless transmission line"),
+      23.0,
+      false,
+      0.0
+    );
+    try d.circle(65.0, 92.0, 22.0, try String("#23334b"));
+    d.text(65.0, 97.0, try String("Vs"), 16.0, true, 0.0);
+    try d.line(65.0, 70.0, 985.0, 70.0, ink, 2.0);
+    try d.line(65.0, 114.0, 985.0, 114.0, ink, 2.0);
+    try d.line(65.0, 70.0, 65.0, 76.0, ink, 2.0);
+    try d.line(65.0, 108.0, 65.0, 114.0, ink, 2.0);
+    d.text(
+      180.0,
+      61.0,
+      try `Rs = ${state.simulation.config.source_r} ohm`,
+      14.0,
+      true,
+      0.0
+    );
     d.text(
       510.0,
       61.0,
-      `Z0 = ${state.simulation.config.z} ohm; length = ${state.simulation.config.length} m`,
+      try `Z0 = ${state.simulation.config.z} ohm; length = ${state.simulation.config.length} m`,
       14.0,
       true,
       0.0
@@ -141,15 +167,15 @@ public module charts {
     d.text(
       510.0,
       97.0,
-      String("incident  →                       ←  reflected"),
+      try String("incident  →                       ←  reflected"),
       16.0,
       true,
       0.0
     );
     if (state.active_load != 0) {
-      d.line(985.0, 70.0, 985.0, 114.0, String("#73e2cb"), 5.0);
+      try d.line(985.0, 70.0, 985.0, 114.0, try String("#73e2cb"), 5.0);
     }
-    d.text(900.0, 136.0, app.load_name(state.active_load), 14.0, true, 0.0);
+    d.text(900.0, 136.0, try app.load_name(state.active_load), 14.0, true, 0.0);
     var v = try spatial(state, false);
     var i = try spatial(state, true);
     d.place(5.0, 150.0, v);

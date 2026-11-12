@@ -32,13 +32,13 @@ module desktop {
   }
 
   /** Locates a toolbar action by its stable nested key path. */
-  function action(tree: const ref ui.Tree, key: i64) u64 {
+  function action(tree: const ref ui.Tree, key: i64) AllocationResult<u64> {
     var a = make_heap_allocator();
-    var path = Vec<ui.Key>(a, 3);
-    path.push(ui.Key(1000));
-    path.push(ui.Key(1001));
-    path.push(ui.Key(key));
-    return tree.identity_path(path);
+    var path = try Vec<ui.Key>(a, 3);
+    try path.push(try ui.Key(1000));
+    try path.push(try ui.Key(1001));
+    try path.push(try ui.Key(key));
+    return AllocationResult.Ok(tree.identity_path(path));
   }
 
   /** Exercises real GTK button events before the numerical preset acceptance checks. */
@@ -46,14 +46,14 @@ module desktop {
     renderer: ref ui_gtk.Renderer,
     session: ref ui.Session<app.State>
   ) SystemResult<void> {
-    renderer.click(action(session.tree, 1));
+    renderer.click(try action(session.tree, 1));
     renderer.poll(session.tree, session.queue, false);
     try session.dispatch(renderer);
     if (not session.state.running) {
       return SystemResult.Error(Error(1, "Run button did not start playback"));
     }
     session.state.tick(0.05);
-    renderer.click(action(session.tree, 1));
+    renderer.click(try action(session.tree, 1));
     renderer.poll(session.tree, session.queue, false);
     try session.dispatch(renderer);
     var steps = session.state.simulation.steps;
@@ -61,26 +61,26 @@ module desktop {
     if (session.state.running or session.state.simulation.steps != steps) {
       return SystemResult.Error(Error(1, "Pause did not preserve time"));
     }
-    renderer.click(action(session.tree, 3));
+    renderer.click(try action(session.tree, 3));
     renderer.poll(session.tree, session.queue, false);
     try session.dispatch(renderer);
     if (session.state.simulation.steps != steps + 1) {
       return SystemResult.Error(Error(1, "Single step did not advance exactly once"));
     }
-    renderer.click(action(session.tree, 2));
+    renderer.click(try action(session.tree, 2));
     renderer.poll(session.tree, session.queue, false);
     try session.dispatch(renderer);
     if (session.state.simulation.steps != 0) {
       return SystemResult.Error(Error(1, "Reset did not clear time"));
     }
     var a = make_heap_allocator();
-    var path = Vec<ui.Key>(a, 5);
-    path.push(ui.Key(1000));
-    path.push(ui.Key(1003));
-    path.push(ui.Key(1004));
-    path.push(ui.Key(1005));
-    path.push(ui.Key(21));
-    var empty = String("");
+    var path = try Vec<ui.Key>(a, 5);
+    try path.push(try ui.Key(1000));
+    try path.push(try ui.Key(1003));
+    try path.push(try ui.Key(1004));
+    try path.push(try ui.Key(1005));
+    try path.push(try ui.Key(21));
+    var empty = try String("");
     try renderer.edit(session.tree.identity_path(path), empty, 1);
     renderer.poll(session.tree, session.queue, false);
     try session.dispatch(renderer);
@@ -94,7 +94,7 @@ module desktop {
     if (session.state.simulation.voltage(64) != 0.0 or
       session.state.simulation.voltage(192) != 1.0 or session.state.simulation.voltage(320) != 0.0) {
       return SystemResult.Error(
-        Error(
+        try Error(
           1,
           "Pulse did not have distinct leading and trailing edges before reaching the load"
         )
@@ -118,8 +118,8 @@ module desktop {
       );
     }
     // Numeric edits and load selections apply without a separate confirmation button.
-    ignore_error(path.set(4, ui.Key(100)));
-    var amplitude = String("2");
+    ignore_error(path.set(4, try ui.Key(100)));
+    var amplitude = try String("2");
     try renderer.edit(session.tree.identity_path(path), amplitude, 0);
     renderer.poll(session.tree, session.queue, false);
     try session.dispatch(renderer);
@@ -128,7 +128,7 @@ module desktop {
       return SystemResult.Error(Error(1, "Numeric edit did not automatically reset the circuit"));
     }
     session.state.advance(32);
-    var incomplete = String("-");
+    var incomplete = try String("-");
     try renderer.edit(session.tree.identity_path(path), incomplete, 0);
     renderer.poll(session.tree, session.queue, false);
     try session.dispatch(renderer);
@@ -138,7 +138,7 @@ module desktop {
     try renderer.edit(session.tree.identity_path(path), amplitude, 0);
     renderer.poll(session.tree, session.queue, false);
     try session.dispatch(renderer);
-    ignore_error(path.set(4, ui.Key(20)));
+    ignore_error(path.set(4, try ui.Key(20)));
     try renderer.edit(session.tree.identity_path(path), empty, 0);
     renderer.poll(session.tree, session.queue, false);
     try session.dispatch(renderer);
@@ -148,7 +148,7 @@ module desktop {
     // Restore the pulse snapshot used by the graphical export acceptance check.
     try session.state.preset(0);
     session.state.wave_index = 3;
-    session.state.apply();
+    try session.state.apply();
     session.state.advance(256);
     return SystemResult.Ok;
   }
@@ -157,8 +157,8 @@ module desktop {
   public function run(automated: bool) SystemResult<void> {
     var frame_interval = 1.0 / 240.0;
     var state = try app.State();
-    var title = String("Sun Tline — Transmission line simulator");
-    var renderer = try ui_gtk.Renderer(title, String("org.namo.sun_tline"));
+    var title = try String("Sun Tline — Transmission line simulator");
+    var renderer = try ui_gtk.Renderer(title, try String("org.namo.sun_tline"));
     try renderer.set_default_size(1350, 950);
     var area = try gtk.DrawingArea();
     try renderer.register_drawing(1, gtk.DrawingArea(area));
@@ -170,7 +170,7 @@ module desktop {
       try paint(area, session.state);
       try await_paint(renderer, session, area);
       var pulse_drawing = try charts.document(session.state);
-      var pulse_path = String("build/pulse-acceptance.svg");
+      var pulse_path = try String("build/pulse-acceptance.svg");
       try std.io.write_string(pulse_path, pulse_drawing);
       for (var p: i64 = 0; p < 8; p += 1) {
         try session.state.preset(p);
@@ -194,20 +194,20 @@ module desktop {
         renderer.poll(session.tree, session.queue, false);
       }
       var duration = started.elapsed();
-      println(
-        `Wave frame preparation: ${duration.as_secs_f64() * 1000.0 / 60.0} ms/frame`
+      std.io.println(
+        try `Wave frame preparation: ${duration.as_secs_f64() * 1000.0 / 60.0} ms/frame`
       );
       session.state.running = false;
       try await_paint(renderer, session, area);
       var drawing = try charts.document(session.state);
-      var path = String("build/acceptance.svg");
+      var path = try String("build/acceptance.svg");
       try std.io.write_string(path, drawing);
       session.tree.shutdown(renderer);
       try renderer.unregister_drawing(1);
       if (renderer.creates != renderer.removals) {
         return SystemResult.Error(Error(1, "Controls survived shutdown"));
       }
-      println("Sun Tline GTK acceptance passed");
+      std.io.println("Sun Tline GTK acceptance passed");
       return SystemResult.Ok;
     }
     var previous = std.time.now();
@@ -260,17 +260,12 @@ module desktop {
 }
 
 /** Selects the desktop application or its native acceptance mode. */
-function main(argc: i32, argv: raw_ptr<raw_ptr<i8>>) i32 {
+function main(argc: i32, argv: raw_ptr<raw_ptr<i8>>) Result<i32> {
   var a = make_heap_allocator();
-  var env = std.env.Env(a);
-  var args = env.args(argc, argv);
-  return match desktop.run(args.size() == 2 and args[1].equals_literal("--self-test")) {
-    SystemResult.Ok => 0,
-    SystemResult.Error(error) => {
-      eprintln(error.message());
-      return 1;
-    }
-  };
+  var env = try std.env.Env(a);
+  var args = try env.args(argc, argv);
+  try desktop.run(args.size() == 2 and args[1].equals_literal("--self-test"));
+  return Result.Ok(0);
 }
 manifest {
   libraries: [
