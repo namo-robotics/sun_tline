@@ -50,25 +50,21 @@ public module tline {
     }
 
     /** Rejects invalid values and underresolved circuits before allocating buffers. */
-    public const method validate() SystemResult<void> {
+    public const method validate() void throws {
       if (not finite(this.amplitude) or not positive(this.z) or not positive(this.length) or
         not positive(this.velocity) or not finite(this.source_r) or this.source_r < 0.0 or
         not finite(this.resistance) or this.resistance < 0.0 or this.cells < 32 or
         this.cells > 16384) {
-        return SystemResult.Error(
-          Error(
-            1,
-            "Use finite values, positive line parameters, nonnegative resistances, and 32–16384 cells."
-          )
+        throw Error(
+          1,
+          "Use finite values, positive line parameters, nonnegative resistances, and 32–16384 cells."
         );
       }
       var dt = this.transit() / _convert<f64>(this.cells);
       if (not positive(dt) or not finite(2.0 * this.amplitude) or
         not finite(this.amplitude / this.z) or not finite(this.source_r + this.z) or
         not finite(this.r() + this.z)) {
-        return SystemResult.Error(
-          Error(1, "Circuit values exceed the supported numerical range.")
-        );
+        throw Error(1, "Circuit values exceed the supported numerical range.");
       }
       if ((this.has_c() and
         (not positive(this.capacitance) or not positive((this.z + this.r()) * this.capacitance) or
@@ -79,21 +75,17 @@ public module tline {
         (this.wave == Wave.Sine and (not positive(this.frequency) or dt * this.frequency > 0.01)) or
         (this.wave == Wave.Pulse and (not positive(this.pulse) or dt * 20.0 > this.pulse)) or
         (this.wave == Wave.SinePulse and (not positive(this.pulse) or dt * 100.0 > this.pulse))) {
-        return SystemResult.Error(
-          Error(
-            1,
-            "Increase cells or slow the source/load: reactive time scales and pulses need 20 steps, sine periods and sine pulses 100 steps."
-          )
+        throw Error(
+          1,
+          "Increase cells or slow the source/load: reactive time scales and pulses need 20 steps, sine periods and sine pulses 100 steps."
         );
       }
       var rc = this.has_c() ? dt / (2.0 * this.capacitance) : 0.0;
       var rl = this.has_l() ? 2.0 * this.inductance / dt : 0.0;
       if (not finite(rc + rl + this.z + this.r())) {
-        return SystemResult.Error(
-          Error(1, "Reactive companion values exceed the numerical range.")
-        );
+        throw Error(1, "Reactive companion values exceed the numerical range.");
       }
-      return SystemResult.Ok;
+      return;
     }
 
     /** Evaluates the ideal source voltage at a physical time. */
@@ -177,15 +169,15 @@ public module tline {
     var il: f64 = 0.0;
 
     /** Validates and owns a circuit, initially unenergized except for the launched source boundary. */
-    init(config: Config) SystemResult<void> {
-      try config.validate();
+    init(config: Config) throws {
+      config.validate();
       this.dt = config.transit() / _convert<f64>(config.cells);
       var a = make_heap_allocator();
-      this.forward = try Vec<f64>(a, config.cells + 1);
-      this.backward = try Vec<f64>(a, config.cells + 1);
+      this.forward = Vec<f64>(a, config.cells + 1);
+      this.backward = Vec<f64>(a, config.cells + 1);
       for (var i: i64 = 0; i <= config.cells; i += 1) {
-        try this.forward.push(0.0);
-        try this.backward.push(0.0);
+        this.forward.push(0.0);
+        this.backward.push(0.0);
       }
       this.forward[0] = config.source(0.0) * (config.z / (config.source_r + config.z));
       this.config = config;

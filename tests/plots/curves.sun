@@ -12,19 +12,19 @@ public module charts {
   }
 
   /** Checks every original point against the simplified curve and preserves endpoints. */
-  function verify(pulse: bool) std.test.AssertionResult<void> {
-    var series = try plot.Series(
-      try String("Reference"),
-      try String("blue"),
+  function verify(pulse: bool) void throws {
+    var series = plot.Series(
+      String("Reference"),
+      String("blue"),
       false
     );
     for (var i: i64 = 0; i <= 1000; i += 1) {
       series.add(_convert<f64>(i), reference(i, pulse));
     }
-    try simplify(series, 0.001);
-    try std.test.assert(series.points.size() < 500);
-    try std.test.assert_eq(series.points[0].x, 0.0);
-    try std.test.assert_eq(series.points[series.points.size() - 1].x, 1000.0);
+    simplify(series, 0.001);
+    std.test.assert(series.points.size() < 500);
+    std.test.assert_eq(series.points[0].x, 0.0);
+    std.test.assert_eq(series.points[series.points.size() - 1].x, 1000.0);
     var segment: i64 = 0;
     for (var i: i64 = 0; i <= 1000; i += 1) {
       var x = _convert<f64>(i);
@@ -35,18 +35,18 @@ public module charts {
         (series.points[segment + 1].x - series.points[segment].x);
       var y = series.points[segment].y +
         fraction * (series.points[segment + 1].y - series.points[segment].y);
-      try std.test.assert(tline.absolute(y - reference(i, pulse)) <= 0.001000001);
+      std.test.assert(tline.absolute(y - reference(i, pulse)) <= 0.001000001);
     }
-    return std.test.AssertionResult.Ok;
+    return;
   }
 
   /** Keeps a sine wave within the requested visual error after reducing SVG work. */
-  test_function smooth_curve_accuracy() std.test.AssertionResult<void> {
+  test_function smooth_curve_accuracy() {
     return verify(false);
   }
 
   /** Preserves the height and position of a sharp pulse's leading and trailing fronts. */
-  test_function sharp_front_accuracy() std.test.AssertionResult<void> {
+  test_function sharp_front_accuracy() {
     return verify(true);
   }
 }

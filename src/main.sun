@@ -4,11 +4,11 @@ using std;
 module desktop {
 
   /** Replaces a drawing only after its SVG parses successfully. */
-  function paint(area: ref gtk.DrawingArea, state: const ref app.State) SystemResult<void> {
-    var content = try charts.document(state);
-    var document = try svg.Document(content);
+  function paint(area: ref gtk.DrawingArea, state: const ref app.State) void throws {
+    var content = charts.document(state);
+    var document = svg.Document(content);
     area.set_document(document);
-    return SystemResult.Ok;
+    return;
   }
 
   /** Polls until GTK paints or a bounded acceptance deadline expires. */
@@ -16,199 +16,195 @@ module desktop {
     renderer: ref ui_gtk.Renderer,
     session: ref ui.Session<app.State>,
     area: const ref gtk.DrawingArea
-  ) SystemResult<void> {
+  ) void throws {
     for (var i: i64 = 0; i < 200; i += 1) {
       renderer.poll(session.tree, session.queue, false);
-      try session.dispatch(renderer);
+      session.dispatch(renderer);
       if (area.rendered()) {
-        return SystemResult.Ok;
+        return;
       }
       if (area.render_failed()) {
-        return SystemResult.Error(Error(1, "Drawing failed to paint"));
+        throw Error(1, "Drawing failed to paint");
       }
       std.time.sleep(std.time.create_duration_millis(10));
     }
-    return SystemResult.Error(Error(1, "Drawing paint timed out"));
+    throw Error(1, "Drawing paint timed out");
   }
 
   /** Locates a toolbar action by its stable nested key path. */
-  function action(tree: const ref ui.Tree, key: i64) AllocationResult<u64> {
+  function action(tree: const ref ui.Tree, key: i64) u64 throws {
     var a = make_heap_allocator();
-    var path = try Vec<ui.Key>(a, 3);
-    try path.push(try ui.Key(1000));
-    try path.push(try ui.Key(1001));
-    try path.push(try ui.Key(key));
-    return AllocationResult.Ok(tree.identity_path(path));
+    var path = Vec<ui.Key>(a, 3);
+    path.push(ui.Key(1000));
+    path.push(ui.Key(1001));
+    path.push(ui.Key(key));
+    return tree.identity_path(path);
   }
 
   /** Exercises real GTK button events before the numerical preset acceptance checks. */
   function controls_test(
     renderer: ref ui_gtk.Renderer,
     session: ref ui.Session<app.State>
-  ) SystemResult<void> {
-    renderer.click(try action(session.tree, 1));
+  ) void throws {
+    renderer.click(action(session.tree, 1));
     renderer.poll(session.tree, session.queue, false);
-    try session.dispatch(renderer);
+    session.dispatch(renderer);
     if (not session.state.running) {
-      return SystemResult.Error(Error(1, "Run button did not start playback"));
+      throw Error(1, "Run button did not start playback");
     }
     session.state.tick(0.05);
-    renderer.click(try action(session.tree, 1));
+    renderer.click(action(session.tree, 1));
     renderer.poll(session.tree, session.queue, false);
-    try session.dispatch(renderer);
+    session.dispatch(renderer);
     var steps = session.state.simulation.steps;
     session.state.tick(0.05);
     if (session.state.running or session.state.simulation.steps != steps) {
-      return SystemResult.Error(Error(1, "Pause did not preserve time"));
+      throw Error(1, "Pause did not preserve time");
     }
-    renderer.click(try action(session.tree, 3));
+    renderer.click(action(session.tree, 3));
     renderer.poll(session.tree, session.queue, false);
-    try session.dispatch(renderer);
+    session.dispatch(renderer);
     if (session.state.simulation.steps != steps + 1) {
-      return SystemResult.Error(Error(1, "Single step did not advance exactly once"));
+      throw Error(1, "Single step did not advance exactly once");
     }
-    renderer.click(try action(session.tree, 2));
+    renderer.click(action(session.tree, 2));
     renderer.poll(session.tree, session.queue, false);
-    try session.dispatch(renderer);
+    session.dispatch(renderer);
     if (session.state.simulation.steps != 0) {
-      return SystemResult.Error(Error(1, "Reset did not clear time"));
+      throw Error(1, "Reset did not clear time");
     }
     var a = make_heap_allocator();
-    var path = try Vec<ui.Key>(a, 5);
-    try path.push(try ui.Key(1000));
-    try path.push(try ui.Key(1003));
-    try path.push(try ui.Key(1004));
-    try path.push(try ui.Key(1005));
-    try path.push(try ui.Key(21));
-    var empty = try String("");
-    try renderer.edit(session.tree.identity_path(path), empty, 1);
+    var path = Vec<ui.Key>(a, 5);
+    path.push(ui.Key(1000));
+    path.push(ui.Key(1003));
+    path.push(ui.Key(1004));
+    path.push(ui.Key(1005));
+    path.push(ui.Key(21));
+    var empty = String("");
+    renderer.edit(session.tree.identity_path(path), empty, 1);
     renderer.poll(session.tree, session.queue, false);
-    try session.dispatch(renderer);
+    session.dispatch(renderer);
     if (session.state.simulation.config.wave != tline.Wave.Pulse or
       session.state.simulation.steps != 0) {
-      return SystemResult.Error(
-        Error(1, "Pulse selection did not immediately reset the active waveform")
-      );
+      throw Error(1, "Pulse selection did not immediately reset the active waveform");
     }
     session.state.advance(256);
     if (session.state.simulation.voltage(64) != 0.0 or
       session.state.simulation.voltage(192) != 1.0 or session.state.simulation.voltage(320) != 0.0) {
-      return SystemResult.Error(
-        try Error(
-          1,
-          "Pulse did not have distinct leading and trailing edges before reaching the load"
-        )
+      throw Error(
+        1,
+        "Pulse did not have distinct leading and trailing edges before reaching the load"
       );
     }
-    try renderer.edit(session.tree.identity_path(path), empty, 3);
+    renderer.edit(session.tree.identity_path(path), empty, 3);
     renderer.poll(session.tree, session.queue, false);
-    try session.dispatch(renderer);
+    session.dispatch(renderer);
     if (session.state.simulation.config.wave != tline.Wave.SinePulse or
       session.state.simulation.steps != 0) {
-      return SystemResult.Error(
-        Error(1, "Sine pulse selection did not reset the active waveform")
-      );
+      throw Error(1, "Sine pulse selection did not reset the active waveform");
     }
     session.state.advance(256);
     if (tline.absolute(session.state.simulation.voltage(160) + 1.0) > 1e-10 or
       tline.absolute(session.state.simulation.voltage(224) - 1.0) > 1e-10 or
       session.state.simulation.voltage(64) != 0.0) {
-      return SystemResult.Error(
-        Error(1, "Sine pulse did not propagate both lobes followed by zero")
-      );
+      throw Error(1, "Sine pulse did not propagate both lobes followed by zero");
     }
     // Numeric edits and load selections apply without a separate confirmation button.
-    ignore_error(path.set(4, try ui.Key(100)));
-    var amplitude = try String("2");
-    try renderer.edit(session.tree.identity_path(path), amplitude, 0);
+    try {
+      path.set(4, ui.Key(100));
+    } catch {}
+    var amplitude = String("2");
+    renderer.edit(session.tree.identity_path(path), amplitude, 0);
     renderer.poll(session.tree, session.queue, false);
-    try session.dispatch(renderer);
+    session.dispatch(renderer);
     if (session.state.simulation.config.amplitude != 2.0 or session.state.simulation.steps != 0 or
       session.state.running) {
-      return SystemResult.Error(Error(1, "Numeric edit did not automatically reset the circuit"));
+      throw Error(1, "Numeric edit did not automatically reset the circuit");
     }
     session.state.advance(32);
-    var incomplete = try String("-");
-    try renderer.edit(session.tree.identity_path(path), incomplete, 0);
+    var incomplete = String("-");
+    renderer.edit(session.tree.identity_path(path), incomplete, 0);
     renderer.poll(session.tree, session.queue, false);
-    try session.dispatch(renderer);
+    session.dispatch(renderer);
     if (session.state.simulation.config.amplitude != 2.0 or session.state.simulation.steps != 32) {
-      return SystemResult.Error(Error(1, "Incomplete edit changed the active experiment"));
+      throw Error(1, "Incomplete edit changed the active experiment");
     }
-    try renderer.edit(session.tree.identity_path(path), amplitude, 0);
+    renderer.edit(session.tree.identity_path(path), amplitude, 0);
     renderer.poll(session.tree, session.queue, false);
-    try session.dispatch(renderer);
-    ignore_error(path.set(4, try ui.Key(20)));
-    try renderer.edit(session.tree.identity_path(path), empty, 0);
+    session.dispatch(renderer);
+    try {
+      path.set(4, ui.Key(20));
+    } catch {}
+    renderer.edit(session.tree.identity_path(path), empty, 0);
     renderer.poll(session.tree, session.queue, false);
-    try session.dispatch(renderer);
+    session.dispatch(renderer);
     if (session.state.simulation.config.load != tline.Load.Open) {
-      return SystemResult.Error(Error(1, "Load selection did not automatically apply"));
+      throw Error(1, "Load selection did not automatically apply");
     }
     // Restore the pulse snapshot used by the graphical export acceptance check.
-    try session.state.preset(0);
+    session.state.preset(0);
     session.state.wave_index = 3;
-    try session.state.apply();
+    session.state.apply();
     session.state.advance(256);
-    return SystemResult.Ok;
+    return;
   }
 
   /** Runs interactive playback or a bounded native smoke test. */
-  public function run(automated: bool) SystemResult<void> {
+  public function run(automated: bool) void throws {
     var frame_interval = 1.0 / 240.0;
-    var state = try app.State();
-    var title = try String("Sun Tline — Transmission line simulator");
-    var renderer = try ui_gtk.Renderer(title, try String("org.namo.sun_tline"));
-    try renderer.set_default_size(1350, 950);
-    var area = try gtk.DrawingArea();
-    try renderer.register_drawing(1, gtk.DrawingArea(area));
+    var state = app.State();
+    var title = String("Sun Tline — Transmission line simulator");
+    var renderer = ui_gtk.Renderer(title, String("org.namo.sun_tline"));
+    renderer.set_default_size(1350, 950);
+    var area = gtk.DrawingArea();
+    renderer.register_drawing(1, gtk.DrawingArea(area));
     var session = ui.Session<app.State>(state, controls.view, controls.handle);
-    try paint(area, session.state);
-    try session.render(renderer);
+    paint(area, session.state);
+    session.render(renderer);
     if (automated) {
-      try controls_test(renderer, session);
-      try paint(area, session.state);
-      try await_paint(renderer, session, area);
-      var pulse_drawing = try charts.document(session.state);
-      var pulse_path = try String("build/pulse-acceptance.svg");
-      try std.io.write_string(pulse_path, pulse_drawing);
+      controls_test(renderer, session);
+      paint(area, session.state);
+      await_paint(renderer, session, area);
+      var pulse_drawing = charts.document(session.state);
+      var pulse_path = String("build/pulse-acceptance.svg");
+      std.io.write_string(pulse_path, pulse_drawing);
       for (var p: i64 = 0; p < 8; p += 1) {
-        try session.state.preset(p);
+        session.state.preset(p);
         session.state.advance(2048);
         session.state.components = true;
-        try paint(area, session.state);
-        try session.render(renderer);
-        try await_paint(renderer, session, area);
+        paint(area, session.state);
+        session.render(renderer);
+        await_paint(renderer, session, area);
       }
-      try renderer.set_default_size(1100, 800);
-      try paint(area, session.state);
-      try await_paint(renderer, session, area);
+      renderer.set_default_size(1100, 800);
+      paint(area, session.state);
+      await_paint(renderer, session, area);
       // Measure repeated wave rendering after the initial transient.
       session.state.advance(512 * 40);
       session.state.running = true;
       var started = std.time.now();
       for (var frame: i64 = 0; frame < 60; frame += 1) {
         session.state.tick(frame_interval);
-        try paint(area, session.state);
-        try session.render(renderer);
+        paint(area, session.state);
+        session.render(renderer);
         renderer.poll(session.tree, session.queue, false);
       }
       var duration = started.elapsed();
       std.io.println(
-        try `Wave frame preparation: ${duration.as_secs_f64() * 1000.0 / 60.0} ms/frame`
+        `Wave frame preparation: ${duration.as_secs_f64() * 1000.0 / 60.0} ms/frame`
       );
       session.state.running = false;
-      try await_paint(renderer, session, area);
-      var drawing = try charts.document(session.state);
-      var path = try String("build/acceptance.svg");
-      try std.io.write_string(path, drawing);
+      await_paint(renderer, session, area);
+      var drawing = charts.document(session.state);
+      var path = String("build/acceptance.svg");
+      std.io.write_string(path, drawing);
       session.tree.shutdown(renderer);
-      try renderer.unregister_drawing(1);
+      renderer.unregister_drawing(1);
       if (renderer.creates != renderer.removals) {
-        return SystemResult.Error(Error(1, "Controls survived shutdown"));
+        throw Error(1, "Controls survived shutdown");
       }
       std.io.println("Sun Tline GTK acceptance passed");
-      return SystemResult.Ok;
+      return;
     }
     var previous = std.time.now();
     var status_clock = std.time.now();
@@ -217,7 +213,7 @@ module desktop {
     var last_revision = session.state.revision;
     while (renderer.running()) {
       renderer.poll(session.tree, session.queue, false);
-      try session.dispatch(renderer);
+      session.dispatch(renderer);
       var now = std.time.now();
       var elapsed = now.since(previous);
       previous = now;
@@ -228,11 +224,11 @@ module desktop {
         (session.state.simulation.steps != last_step and not session.state.running) or
         session.state.revision != last_revision) {
         frame_clock = std.time.now();
-        try paint(area, session.state);
+        paint(area, session.state);
         var status_elapsed = status_clock.elapsed();
         if (not session.state.running or session.state.revision != last_revision or
           status_elapsed.as_secs_f64() >= 0.1) {
-          try session.render(renderer);
+          session.render(renderer);
           status_clock = std.time.now();
         }
         last_step = session.state.simulation.steps;
@@ -241,7 +237,7 @@ module desktop {
       // GTK must keep servicing input and its frame clock between wave updates.
       // A blocking sleep here also stalls native scrolling, even while paused.
       if (not session.state.running) {
-        try renderer.wait_events(session.tree, session.queue, 0);
+        renderer.wait_events(session.tree, session.queue, 0);
       } else {
         var work = frame_clock.elapsed();
         var remaining = frame_interval - work.as_secs_f64();
@@ -250,22 +246,22 @@ module desktop {
         if (remaining > 0.0) {
           timeout = _convert<u32>(remaining * 1000.0) + 1;
         }
-        try renderer.wait_events(session.tree, session.queue, timeout);
+        renderer.wait_events(session.tree, session.queue, timeout);
       }
     }
     session.tree.shutdown(renderer);
-    try renderer.unregister_drawing(1);
-    return SystemResult.Ok;
+    renderer.unregister_drawing(1);
+    return;
   }
 }
 
 /** Selects the desktop application or its native acceptance mode. */
-function main(argc: i32, argv: raw_ptr<raw_ptr<i8>>) Result<i32> {
+function main(argc: i32, argv: raw_ptr<raw_ptr<i8>>) i32 throws {
   var a = make_heap_allocator();
-  var env = try std.env.Env(a);
-  var args = try env.args(argc, argv);
-  try desktop.run(args.size() == 2 and args[1].equals_literal("--self-test"));
-  return Result.Ok(0);
+  var env = std.env.Env(a);
+  var args = env.args(argc, argv);
+  desktop.run(args.size() == 2 and args[1].equals_literal("--self-test"));
+  return 0;
 }
 manifest {
   libraries: [

@@ -4,29 +4,29 @@ using std;
 public module app {
 
   /** Provides descriptive names for the supported termination circuits. */
-  public function load_name(index: i64) AllocationResult<String> {
+  public function load_name(index: i64) String throws {
     if (index == 0) {
-      return AllocationResult.Ok(try String("Open circuit"));
+      return String("Open circuit");
     }
     if (index == 1) {
-      return AllocationResult.Ok(try String("Short circuit"));
+      return String("Short circuit");
     }
     if (index == 2) {
-      return AllocationResult.Ok(try String("Resistor"));
+      return String("Resistor");
     }
     if (index == 3) {
-      return AllocationResult.Ok(try String("Capacitor"));
+      return String("Capacitor");
     }
     if (index == 4) {
-      return AllocationResult.Ok(try String("Inductor"));
+      return String("Inductor");
     }
     if (index == 5) {
-      return AllocationResult.Ok(try String("Series RC"));
+      return String("Series RC");
     }
     if (index == 6) {
-      return AllocationResult.Ok(try String("Series RL"));
+      return String("Series RL");
     }
-    return AllocationResult.Ok(try String("Series RLC"));
+    return String("Series RLC");
   }
 
   /** Maps a validated choice to its physical load. */
@@ -56,61 +56,59 @@ public module app {
   }
 
   /** Formats physical time with stable decimal precision and a readable SI unit. */
-  public function time_label(seconds: f64) AllocationResult<String> {
+  public function time_label(seconds: f64) String throws {
     var scale: f64 = 1e9;
-    var unit = try String("ns");
+    var unit = String("ns");
     if (seconds >= 1.0) {
       scale = 1.0;
-      unit = try String("s");
+      unit = String("s");
     } else if (seconds >= 1e-3) {
       scale = 1e3;
-      unit = try String("ms");
+      unit = String("ms");
     } else if (seconds >= 1e-6) {
       scale = 1e6;
-      unit = try String("us");
+      unit = String("us");
     }
     if (not tline.finite(seconds) or seconds < 0.0 or seconds >= 1e12) {
-      return AllocationResult.Ok(try `${seconds} s`);
+      return `${seconds} s`;
     }
     var rounded = _convert<i64>(seconds * scale * 1000.0 + 0.5);
-    var fraction = try `${rounded % 1000}`;
+    var fraction = `${rounded % 1000}`;
     while (fraction.length() < 3) {
-      fraction = try `0${fraction}`;
+      fraction = `0${fraction}`;
     }
-    return AllocationResult.Ok(try `${rounded / 1000}.${fraction} ${unit}`);
+    return `${rounded / 1000}.${fraction} ${unit}`;
   }
 
   /** Names one source waveform. */
-  public function wave_name(index: i64) AllocationResult<String> {
-    return AllocationResult.Ok(
-      try String(index == 0 ? "Step" : index == 1 ? "Pulse" : index == 2 ? "Sine" : "Sine pulse")
-    );
+  public function wave_name(index: i64) String throws {
+    return String(index == 0 ? "Step" : index == 1 ? "Pulse" : index == 2 ? "Sine" : "Sine pulse");
   }
 
   /** Names an educational preset. */
-  public function preset_name(index: i64) AllocationResult<String> {
+  public function preset_name(index: i64) String throws {
     if (index == 0) {
-      return AllocationResult.Ok(try String("Repeated reflections"));
+      return String("Repeated reflections");
     }
     if (index == 1) {
-      return AllocationResult.Ok(try String("Matched line"));
+      return String("Matched line");
     }
     if (index == 2) {
-      return AllocationResult.Ok(try String("Open end"));
+      return String("Open end");
     }
     if (index == 3) {
-      return AllocationResult.Ok(try String("Shorted end"));
+      return String("Shorted end");
     }
     if (index == 4) {
-      return AllocationResult.Ok(try String("Capacitive charging"));
+      return String("Capacitive charging");
     }
     if (index == 5) {
-      return AllocationResult.Ok(try String("Inductive response"));
+      return String("Inductive response");
     }
     if (index == 6) {
-      return AllocationResult.Ok(try String("RLC ringing"));
+      return String("RLC ringing");
     }
-    return AllocationResult.Ok(try String("Sine standing wave"));
+    return String("Sine standing wave");
   }
 
   /** Keeps simulation state, draft text, and bounded history explicitly owned. */
@@ -133,43 +131,43 @@ public module app {
     public var history_head: i64 = 0;
 
     /** Creates a validated demonstration with preallocated history capacity. */
-    init() SystemResult<void> {
-      this.message = try String("Paused — choose a preset or press Run.");
+    init() throws {
+      this.message = String("Paused — choose a preset or press Run.");
 
       var a = make_heap_allocator();
-      this.simulation = try tline.Simulation(tline.Config());
-      this.fields = try Vec<String>(a, 12);
-      this.history = try Vec<tline.Sample>(a, 2048);
-      try this.sync_fields();
-      try this.record();
+      this.simulation = tline.Simulation(tline.Config());
+      this.fields = Vec<String>(a, 12);
+      this.history = Vec<tline.Sample>(a, 2048);
+      this.sync_fields();
+      this.record();
     }
 
     /** Rebuilds draft strings from the active physical configuration. */
-    public method sync_fields() AllocationResult<void> {
+    public method sync_fields() void throws {
       this.fields.clear();
-      try this.fields.push(try `${this.simulation.config.amplitude}`);
+      this.fields.push(`${this.simulation.config.amplitude}`);
 
-      try this.fields.push(try `${this.simulation.config.source_r}`);
+      this.fields.push(`${this.simulation.config.source_r}`);
 
-      try this.fields.push(try `${this.simulation.config.z}`);
+      this.fields.push(`${this.simulation.config.z}`);
 
-      try this.fields.push(try `${this.simulation.config.length}`);
+      this.fields.push(`${this.simulation.config.length}`);
 
-      try this.fields.push(try `${this.simulation.config.velocity}`);
+      this.fields.push(`${this.simulation.config.velocity}`);
 
-      try this.fields.push(try `${this.simulation.config.resistance}`);
+      this.fields.push(`${this.simulation.config.resistance}`);
 
-      try this.fields.push(try `${this.simulation.config.capacitance}`);
+      this.fields.push(`${this.simulation.config.capacitance}`);
 
-      try this.fields.push(try `${this.simulation.config.inductance}`);
+      this.fields.push(`${this.simulation.config.inductance}`);
 
-      try this.fields.push(try `${this.simulation.config.pulse}`);
+      this.fields.push(`${this.simulation.config.pulse}`);
 
-      try this.fields.push(try `${this.simulation.config.frequency}`);
+      this.fields.push(`${this.simulation.config.frequency}`);
 
-      try this.fields.push(try `${this.simulation.config.cells}`);
+      this.fields.push(`${this.simulation.config.cells}`);
 
-      return AllocationResult.Ok;
+      return;
     }
 
     /** Reports which physical fields apply to the current draft circuit. */
@@ -193,9 +191,9 @@ public module app {
     }
 
     /** Parses the draft atomically; failure leaves the current experiment unchanged. */
-    public method configuration() SystemResult<tline.Config> {
+    public method configuration() tline.Config throws {
       var a = make_heap_allocator();
-      var values = try Vec<f64>(a, 11);
+      var values = Vec<f64>(a, 11);
       for (var field_index: i64 = 0; field_index < this.fields.size(); field_index += 1) {
         if (not this.field_visible(field_index)) {
           var fallback = this.simulation.config.resistance;
@@ -211,26 +209,27 @@ public module app {
           if (field_index == 9) {
             fallback = this.simulation.config.frequency;
           }
-          try values.push(fallback);
+          values.push(fallback);
           continue;
         }
-        match try this.fields[field_index].parse_f64() {
+        match this.fields[field_index].parse_f64() {
           Option.Some(value) => {
             if (not tline.finite(value)) {
-              return SystemResult.Error(Error(1, "Every field must contain a finite number."));
+              throw Error(1, "Every field must contain a finite number.");
             }
-            try values.push(value);
+            values.push(value);
           },
           Option.None => {
-            return SystemResult.Error(
-              Error(1, "Every field must contain a number, optionally in scientific notation.")
+            throw Error(
+              1,
+              "Every field must contain a number, optionally in scientific notation."
             );
           }
         };
       }
       if (values[10] < 32.0 or values[10] > 16384.0 or
         values[10] != _convert<f64>(_convert<i64>(values[10]))) {
-        return SystemResult.Error(Error(1, "Cells must be an integer from 32 to 16384."));
+        throw Error(1, "Cells must be an integer from 32 to 16384.");
       }
       var c = tline.Config();
       c.load = load(this.load_index);
@@ -247,60 +246,56 @@ public module app {
       c.pulse = values[8];
       c.frequency = values[9];
       c.cells = _convert<i64>(values[10]);
-      try c.validate();
-      return SystemResult.Ok(c);
+      c.validate();
+      return c;
     }
 
     /** Installs a valid circuit and resets playback and history. */
-    public method install(config: tline.Config) SystemResult<void> {
-      this.simulation = try tline.Simulation(config);
+    public method install(config: tline.Config) void throws {
+      this.simulation = tline.Simulation(config);
       this.active_load = this.load_index;
       this.running = false;
       this.credit = 0.0;
       this.history.clear();
       this.history_head = 0;
-      try this.record();
+      this.record();
       this.rescale();
-      this.message = try String("Paused — circuit reset.");
-      return SystemResult.Ok;
+      this.message = String("Paused — circuit reset.");
+      return;
     }
 
     /** Applies draft settings without destroying a valid run on input failure. */
-    public method apply() AllocationResult<void> {
-      match this.configuration() {
-        SystemResult.Ok(config) => {
-          ignore_error(this.install(config));
-        },
-        SystemResult.Error(error) => {
-          this.message = try error.message();
-        },
-        SystemResult.Allocation(error) => {
-          return AllocationResult.Allocation(error);
-        },
-        SystemResult.InvalidArgument(error) => {
-          return AllocationResult.InvalidArgument(error);
-        },
-        SystemResult.Overflow(error) => {
-          return AllocationResult.Overflow(error);
+    public method apply() void throws {
+      var operation_completed_1 = false;
+      try {
+        var config = this.configuration();
+        operation_completed_1 = true;
+        try {
+          this.install(config);
+        } catch {}
+      } catch (error: std.Error) {
+        if (operation_completed_1) {
+          throw;
         }
-      };
+        this.message = error.message();
+      }
 
-      return AllocationResult.Ok;
+      return;
     }
 
     /** Resets the active circuit while discarding uncommitted settings. */
-    public method reset() AllocationResult<void> {
-      try this.sync_fields();
+    public method reset() void throws {
+      this.sync_fields();
       this.load_index = this.active_load;
       this.wave_index = this.simulation.config.wave == tline.Wave.Step ? 0 : this.simulation.config.wave ==
         tline.Wave.Pulse ? 1 : this.simulation.config.wave == tline.Wave.Sine ? 2 : 3;
-      try this.apply();
+      this.apply();
 
-      return AllocationResult.Ok;
+      return;
     }
 
     /** Selects and installs a complete demonstration circuit. */
-    public method preset(index: i64) SystemResult<void> {
+    public method preset(index: i64) void throws {
       var c = tline.Config();
       this.load_index = 2;
       this.wave_index = 0;
@@ -340,22 +335,24 @@ public module app {
         c.wave = tline.Wave.Sine;
         c.frequency = 5e6;
       }
-      try this.install(c);
-      try this.sync_fields();
-      return SystemResult.Ok;
+      this.install(c);
+      this.sync_fields();
+      return;
     }
 
     /** Stores terminal samples in a fixed-capacity ring. */
-    public method record() AllocationResult<void> {
+    public method record() void throws {
       var sample = this.simulation.sample();
       if (this.history.size() < 2048) {
-        try this.history.push(sample);
+        this.history.push(sample);
       } else {
-        ignore_error(this.history.set(this.history_head, sample));
+        try {
+          this.history.set(this.history_head, sample);
+        } catch {}
         this.history_head = (this.history_head + 1) % 2048;
       }
 
-      return AllocationResult.Ok;
+      return;
     }
 
     /** Resolves a chronological sample index in the history ring. */
@@ -364,7 +361,7 @@ public module app {
     }
 
     /** Advances exact steps and samples at a resolution-independent cadence. */
-    public method advance(count: i64) AllocationResult<void> {
+    public method advance(count: i64) void throws {
       var stride = this.simulation.config.cells / 64;
       if (stride < 1) {
         stride = 1;
@@ -372,24 +369,24 @@ public module app {
       for (var i: i64 = 0; i < count; i += 1) {
         if (this.simulation.steps >= 1000000000000) {
           this.running = false;
-          this.message = try String("Time limit reached; reset to begin again.");
-          return AllocationResult.Ok;
+          this.message = String("Time limit reached; reset to begin again.");
+          return;
         }
         this.simulation.step();
         if (not tline.finite(this.simulation.voltage(0)) or
           not tline.finite(this.simulation.voltage(this.simulation.config.cells))) {
           this.running = false;
-          this.message = try String(
+          this.message = String(
             "Numerical range exceeded; reduce excitation or reset the circuit."
           );
-          return AllocationResult.Ok;
+          return;
         }
         if (this.simulation.steps % stride == 0) {
-          try this.record();
+          this.record();
         }
       }
 
-      return AllocationResult.Ok;
+      return;
     }
 
     /** Interpolates forward propagation for display without changing the fixed-step solver. */
@@ -413,21 +410,21 @@ public module app {
     }
 
     /** Retains elapsed-time debt and drains bounded batches without dropping physics steps. */
-    public method tick(seconds: f64) AllocationResult<void> {
+    public method tick(seconds: f64) void throws {
       if (not this.running or not tline.finite(seconds) or seconds < 0.0) {
-        return AllocationResult.Ok;
+        return;
       }
       var pending = this.credit +
         seconds * this.speed * _convert<f64>(this.simulation.config.cells);
       if (not tline.finite(pending)) {
-        return AllocationResult.Ok;
+        return;
       }
       this.credit = pending;
       var steps = this.credit >= 4096.0 ? 4096 : _convert<i64>(this.credit);
       this.credit -= _convert<f64>(steps);
-      try this.advance(steps);
+      this.advance(steps);
 
-      return AllocationResult.Ok;
+      return;
     }
 
     /** Chooses stable symmetric plot limits until the next explicit rescale or circuit reset. */

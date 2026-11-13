@@ -4,9 +4,9 @@ using std;
 public module controls {
 
   /** Applies the studio palette to controls while preserving native focus and hover feedback. */
-  function style(element: ref ui.Element) AllocationResult<void> {
+  function style(element: ref ui.Element) void throws {
     element.style.normal.foreground = 0xdce6f4;
-    element.style.normal.font = try String("Sans");
+    element.style.normal.font = String("Sans");
     element.style.normal.font_size = 14;
     element.style.normal.border_width = 0;
     element.style.normal.radius = 0;
@@ -18,9 +18,9 @@ public module controls {
       element.style.normal.foreground = 0x91a3bc;
       element.style.normal.font_size = 12;
     }
-    if (element.key.equals(try ui.Key(1013)) or element.key.equals(try ui.Key(1014)) or
-      element.key.equals(try ui.Key(1015)) or element.key.equals(try ui.Key(1016))) {
-      element.style.normal.font = try String("Monospace");
+    if (element.key.equals(ui.Key(1013)) or element.key.equals(ui.Key(1014)) or
+      element.key.equals(ui.Key(1015)) or element.key.equals(ui.Key(1016))) {
+      element.style.normal.font = String("Monospace");
     }
     if (element.kind == ui.Kind.Button or element.kind == ui.Kind.TextInput or
       element.kind == ui.Kind.Select) {
@@ -32,14 +32,14 @@ public module controls {
       element.style.disabled.background = 0x1c2b3e;
       element.style.disabled.foreground = 0x6c8098;
     }
-    if (element.key.equals(try ui.Key(1005)) or element.key.equals(try ui.Key(1001))) {
+    if (element.key.equals(ui.Key(1005)) or element.key.equals(ui.Key(1001))) {
       element.style.normal.background = 0x152135;
       element.style.normal.padding = 12;
     }
-    if (element.key.equals(try ui.Key(1000))) {
+    if (element.key.equals(ui.Key(1000))) {
       element.style.normal.padding = 12;
     }
-    if (element.key.equals(try ui.Key(1006))) {
+    if (element.key.equals(ui.Key(1006))) {
       element.style.normal.foreground = 0x73e2cb;
     }
     if (element.kind == ui.Kind.Button and element.action == 1) {
@@ -49,12 +49,12 @@ public module controls {
       element.style.focus.background = 0xb5f6e8;
     }
 
-    return AllocationResult.Ok;
+    return;
   }
 
   /** Appends a layout container and returns its parent index. */
-  function box(view: ref ui.View, parent: i64, key: i64, kind: ui.Kind) AllocationResult<i64> {
-    var e = try ui.Element(try ui.Key(key), kind);
+  function box(view: ref ui.View, parent: i64, key: i64, kind: ui.Kind) i64 throws {
+    var e = ui.Element(ui.Key(key), kind);
     e.spacing = 8;
     e.expand_x = true;
     if (key == 1000 or key == 1003) {
@@ -63,199 +63,187 @@ public module controls {
     if (key == 1000) {
       e.margin = 0;
     }
-    return AllocationResult.Ok(try view.append(parent, e));
+    return view.append(parent, e);
   }
 
   /** Appends a text label. */
-  function label(view: ref ui.View, parent: i64, key: i64, text: String) AllocationResult<void> {
-    var e = try ui.Element(try ui.Key(key), ui.Kind.Label);
+  function label(view: ref ui.View, parent: i64, key: i64, text: String) void throws {
+    var e = ui.Element(ui.Key(key), ui.Kind.Label);
     e.text = text;
-    try view.append(parent, e);
+    view.append(parent, e);
 
-    return AllocationResult.Ok;
+    return;
   }
 
   /** Reserves a stable horizontal slot so changing numeric text cannot move adjacent readouts. */
-  function readout(
-    view: ref ui.View,
-    parent: i64,
-    key: i64,
-    width: i32,
-    text: String
-  ) AllocationResult<void> {
-    var e = try ui.Element(try ui.Key(key), ui.Kind.Label);
+  function readout(view: ref ui.View, parent: i64, key: i64, width: i32, text: String) void throws {
+    var e = ui.Element(ui.Key(key), ui.Kind.Label);
     while (text.length() < _convert<i64>(width / 8)) {
-      try text.append(" ");
+      text.append(" ");
     }
     e.text = text;
     e.width = width;
-    try view.append(parent, e);
+    view.append(parent, e);
 
-    return AllocationResult.Ok;
+    return;
   }
 
   /** Appends an action button with a stable key. */
-  function button(view: ref ui.View, parent: i64, key: i64, text: String) AllocationResult<void> {
-    var e = try ui.Element(try ui.Key(key), ui.Kind.Button);
+  function button(view: ref ui.View, parent: i64, key: i64, text: String) void throws {
+    var e = ui.Element(ui.Key(key), ui.Kind.Button);
     e.text = text;
     e.action = key;
-    try view.append(parent, e);
+    view.append(parent, e);
 
-    return AllocationResult.Ok;
+    return;
   }
 
   /** Appends a controlled selector using numeric option keys. */
-  function select(
-    view: ref ui.View,
-    parent: i64,
-    key: i64,
-    selected: i64,
-    count: i64
-  ) AllocationResult<void> {
-    var e = try ui.Element(try ui.Key(key), ui.Kind.Select);
+  function select(view: ref ui.View, parent: i64, key: i64, selected: i64, count: i64) void throws {
+    var e = ui.Element(ui.Key(key), ui.Kind.Select);
     e.selected = selected;
     e.action = key;
     for (var i: i64 = 0; i < count; i += 1) {
-      var name = try app.preset_name(i);
+      var name = app.preset_name(i);
       if (key == 20) {
-        name = try app.load_name(i);
+        name = app.load_name(i);
       } else if (key == 21) {
-        name = try app.wave_name(i);
+        name = app.wave_name(i);
       }
-      try e.choices.push(ui.Choice(try ui.Key(i), name));
+      e.choices.push(ui.Choice(ui.Key(i), name));
     }
-    try view.append(parent, e);
+    view.append(parent, e);
 
-    return AllocationResult.Ok;
+    return;
   }
 
   /** Names each editable SI-valued physical field. */
-  function field_name(index: i64) AllocationResult<String> {
+  function field_name(index: i64) String throws {
     if (index == 0) {
-      return AllocationResult.Ok(try String("Source amplitude (V)"));
+      return String("Source amplitude (V)");
     }
     if (index == 1) {
-      return AllocationResult.Ok(try String("Source resistance (ohm)"));
+      return String("Source resistance (ohm)");
     }
     if (index == 2) {
-      return AllocationResult.Ok(try String("Line impedance (ohm)"));
+      return String("Line impedance (ohm)");
     }
     if (index == 3) {
-      return AllocationResult.Ok(try String("Length (m)"));
+      return String("Length (m)");
     }
     if (index == 4) {
-      return AllocationResult.Ok(try String("Propagation speed (m/s)"));
+      return String("Propagation speed (m/s)");
     }
     if (index == 5) {
-      return AllocationResult.Ok(try String("Load resistance (ohm)"));
+      return String("Load resistance (ohm)");
     }
     if (index == 6) {
-      return AllocationResult.Ok(try String("Load capacitance (F)"));
+      return String("Load capacitance (F)");
     }
     if (index == 7) {
-      return AllocationResult.Ok(try String("Load inductance (H)"));
+      return String("Load inductance (H)");
     }
     if (index == 8) {
-      return AllocationResult.Ok(try String("Pulse width (s)"));
+      return String("Pulse width (s)");
     }
     if (index == 9) {
-      return AllocationResult.Ok(try String("Sine frequency (Hz)"));
+      return String("Sine frequency (Hz)");
     }
-    return AllocationResult.Ok(try String("Line cells (32–16384)"));
+    return String("Line cells (32–16384)");
   }
 
   /** Creates the complete single-window view from borrowed application state. */
-  public function view(state: const ref app.State) AllocationResult<ui.View> {
+  public function view(state: const ref app.State) ui.View throws {
     var a = make_heap_allocator();
-    var v = try ui.View(a);
-    var root = try box(v, -1, 1000, ui.Kind.Column);
-    var toolbar = try box(v, root, 1001, ui.Kind.Row);
-    button(v, toolbar, 1, try String(state.running ? "Pause" : "Run"));
-    button(v, toolbar, 2, try String("Reset"));
-    button(v, toolbar, 3, try String("Single step"));
-    button(v, toolbar, 4, try String("Rescale"));
-    button(v, toolbar, 5, try String("Slower"));
-    button(v, toolbar, 6, try String("Faster"));
-    try label(v, toolbar, 1002, try `${state.speed} transit/s`);
-    var check = try ui.Element(try ui.Key(7), ui.Kind.Checkbox);
-    check.text = try String("Traveling components");
+    var v = ui.View(a);
+    var root = box(v, -1, 1000, ui.Kind.Column);
+    var toolbar = box(v, root, 1001, ui.Kind.Row);
+    button(v, toolbar, 1, String(state.running ? "Pause" : "Run"));
+    button(v, toolbar, 2, String("Reset"));
+    button(v, toolbar, 3, String("Single step"));
+    button(v, toolbar, 4, String("Rescale"));
+    button(v, toolbar, 5, String("Slower"));
+    button(v, toolbar, 6, String("Faster"));
+    label(v, toolbar, 1002, `${state.speed} transit/s`);
+    var check = ui.Element(ui.Key(7), ui.Kind.Checkbox);
+    check.text = String("Traveling components");
     check.checked = state.components;
     check.action = 7;
-    try v.append(toolbar, check);
-    var body = try box(v, root, 1003, ui.Kind.Row);
-    var scroll = try ui.Element(try ui.Key(1004), ui.Kind.Scroll);
+    v.append(toolbar, check);
+    var body = box(v, root, 1003, ui.Kind.Row);
+    var scroll = ui.Element(ui.Key(1004), ui.Kind.Scroll);
     scroll.width = 300;
     scroll.expand_y = true;
-    var side = try box(v, try v.append(body, scroll), 1005, ui.Kind.Column);
-    try label(v, side, 1006, try String("EXPERIMENT"));
-    try select(v, side, 22, state.preset_index, 8);
-    try label(v, side, 1007, try String("Load circuit"));
-    try select(v, side, 20, state.load_index, 8);
-    try label(v, side, 1008, try String("Source waveform"));
-    try select(v, side, 21, state.wave_index, 4);
+    var side = box(v, v.append(body, scroll), 1005, ui.Kind.Column);
+    label(v, side, 1006, String("EXPERIMENT"));
+    select(v, side, 22, state.preset_index, 8);
+    label(v, side, 1007, String("Load circuit"));
+    select(v, side, 20, state.load_index, 8);
+    label(v, side, 1008, String("Source waveform"));
+    select(v, side, 21, state.wave_index, 4);
     if (state.wave_index == 3) {
-      try label(v, side, 1012, try String("One sine cycle, then zero."));
+      label(v, side, 1012, String("One sine cycle, then zero."));
     }
     for (var i: i64 = 0; i < state.fields.size(); i += 1) {
       if (state.field_visible(i)) {
-        try label(v, side, 200 + i, try field_name(i));
-        var input = try ui.Element(try ui.Key(100 + i), ui.Kind.TextInput);
-        input.text = try state.fields[i].clone(a);
+        label(v, side, 200 + i, field_name(i));
+        var input = ui.Element(ui.Key(100 + i), ui.Kind.TextInput);
+        input.text = state.fields[i].clone(a);
         input.action = 100 + i;
-        try v.append(side, input);
+        v.append(side, input);
       }
     }
-    var drawing = try ui.Element(try ui.Key(30), ui.Kind.Drawing);
+    var drawing = ui.Element(ui.Key(30), ui.Kind.Drawing);
     drawing.drawing_id = 1;
     drawing.expand_x = true;
     drawing.expand_y = true;
     drawing.min_width = 660;
     drawing.min_height = 490;
-    try v.append(body, drawing);
-    var active_wave = try String("Step");
+    v.append(body, drawing);
+    var active_wave = String("Step");
     if (state.simulation.config.wave == tline.Wave.Pulse) {
-      active_wave = try `Pulse (${app.time_label(state.simulation.config.pulse)})`;
+      active_wave = `Pulse (${app.time_label(state.simulation.config.pulse)})`;
     } else if (state.simulation.config.wave == tline.Wave.Sine) {
-      active_wave = try String("Sine");
+      active_wave = String("Sine");
     } else if (state.simulation.config.wave == tline.Wave.SinePulse) {
-      active_wave = try `Sine pulse (${app.time_label(state.simulation.config.pulse)}, one cycle)`;
+      active_wave = `Sine pulse (${app.time_label(state.simulation.config.pulse)}, one cycle)`;
     }
-    var status = try box(v, root, 1009, ui.Kind.Row);
-    try readout(v, status, 1013, 300, active_wave);
-    try readout(
+    var status = box(v, root, 1009, ui.Kind.Row);
+    readout(v, status, 1013, 300, active_wave);
+    readout(
       v,
       status,
       1014,
       190,
-      try `t = ${app.time_label(state.simulation.time())}`
+      `t = ${app.time_label(state.simulation.time())}`
     );
-    try readout(
+    readout(
       v,
       status,
       1015,
       190,
-      try `transit = ${app.time_label(state.simulation.config.transit())}`
+      `transit = ${app.time_label(state.simulation.config.transit())}`
     );
-    try readout(
+    readout(
       v,
       status,
       1016,
       190,
-      try `step = ${state.simulation.steps}`
+      `step = ${state.simulation.steps}`
     );
-    try label(v, root, 1010, try state.message.clone(a));
-    try label(
+    label(v, root, 1010, state.message.clone(a));
+    label(
       v,
       root,
       1011,
-      try String(
+      String(
         "Ideal lossless line: resistance absorbs energy; undamped circuits may keep oscillating. Sine drive remains periodic."
       )
     );
     for (var element: ref ui.Element in v.elements) {
-      try style(element);
+      style(element);
     }
-    return AllocationResult.Ok(v);
+    return v;
   }
 
   /** Applies one user action; invalid draft edits remain visible for correction. */
@@ -263,37 +251,37 @@ public module controls {
     state: ref app.State,
     event: const ref ui.Event,
     queue: ref ui.EventQueue
-  ) SystemResult<void> {
+  ) void throws {
     var a = make_heap_allocator();
     state.revision += 1;
     if (event.action >= 100 and event.action <= 110) {
-      ignore_error(
+      try {
         state.fields.set(
           event.action - 100,
-          try event.value.text.clone(a)
-        )
-      );
-      try state.apply();
+          event.value.text.clone(a)
+        );
+      } catch {}
+      state.apply();
     } else if (event.action >= 20 and event.action <= 22) {
       for (var i: i64 = 0; i < 8; i += 1) {
-        var key = try ui.Key(i);
+        var key = ui.Key(i);
         if (event.value.selection.equals(key)) {
           if (event.action == 20) {
             state.load_index = i;
-            try state.apply();
+            state.apply();
           }
           if (event.action == 21 and i < 4) {
             state.wave_index = i;
-            try state.apply();
+            state.apply();
           }
           if (event.action == 22) {
-            try state.preset(i);
+            state.preset(i);
           }
         }
       }
     } else if (event.action == 1) {
       state.running = not state.running;
-      state.message = try String(
+      state.message = String(
         state.running ? "Running — physical time is slowed for visualization." : "Paused."
       );
     } else if (event.action == 2) {
@@ -317,6 +305,6 @@ public module controls {
     } else if (event.action == 7) {
       state.components = event.value.boolean;
     }
-    return SystemResult.Ok;
+    return;
   }
 }

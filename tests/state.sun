@@ -4,168 +4,180 @@ using std;
 module state_tests {
 
   /** Checks pausing, speed-independent physics, and reset semantics. */
-  test_function playback() std.test.AssertionResult<void> {
-    var a = try app.State();
-    var b = try app.State();
-    try a.tick(0.1);
-    try std.test.assert_eq(a.simulation.steps, 0);
+  test_function playback() {
+    var a = app.State();
+    var b = app.State();
+    a.tick(0.1);
+    std.test.assert_eq(a.simulation.steps, 0);
     a.running = true;
     b.running = true;
     b.speed = 2.0;
     for (var i: i64 = 0; i < 64; i += 1) {
-      try a.tick(0.03125);
-      try b.tick(0.015625);
+      a.tick(0.03125);
+      b.tick(0.015625);
     }
-    try std.test.assert_eq(a.simulation.steps, b.simulation.steps);
+    std.test.assert_eq(a.simulation.steps, b.simulation.steps);
     for (var i: i64 = 0; i <= 512; i += 1) {
-      try std.test.assert_eq(a.simulation.voltage(i), b.simulation.voltage(i));
+      std.test.assert_eq(a.simulation.voltage(i), b.simulation.voltage(i));
     }
-    try a.reset();
-    try std.test.assert_eq(a.simulation.steps, 0);
-    try std.test.assert(not a.running);
-    return std.test.AssertionResult.Ok;
+    a.reset();
+    std.test.assert_eq(a.simulation.steps, 0);
+    std.test.assert(not a.running);
+    return;
   }
 
   /** Delayed frames retain wall time and catch up through bounded batches at maximum settings. */
-  test_function delayed_playback() std.test.AssertionResult<void> {
-    var s = try app.State();
+  test_function delayed_playback() {
+    var s = app.State();
     var c = tline.Config();
     c.cells = 16384;
-    try s.install(c);
+    s.install(c);
     s.running = true;
     s.speed = 8.0;
-    try s.tick(0.25);
-    try std.test.assert_eq(s.simulation.steps, 4096);
-    try std.test.assert_eq(s.credit, 28672.0);
+    s.tick(0.25);
+    std.test.assert_eq(s.simulation.steps, 4096);
+    std.test.assert_eq(s.credit, 28672.0);
     // A backlog must not extrapolate a fractional wave beyond adjacent cells.
-    try std.test.assert_eq(s.display_plus(4097), s.simulation.plus(4097));
+    std.test.assert_eq(s.display_plus(4097), s.simulation.plus(4097));
     for (var i: i64 = 0; i < 7; i += 1) {
       s.tick(0.0);
     }
-    try std.test.assert_eq(s.simulation.steps, 32768);
-    try std.test.assert_eq(s.credit, 0.0);
+    std.test.assert_eq(s.simulation.steps, 32768);
+    std.test.assert_eq(s.credit, 0.0);
     for (var i: i64 = 0; i < 240; i += 1) {
       s.tick(1.0 / 240.0);
     }
-    try std.test.assert(
+    std.test.assert(
       tline.absolute(_convert<f64>(s.simulation.steps) + s.credit - 163840.0) < 1e-6
     );
-    return std.test.AssertionResult.Ok;
+    return;
   }
 
   /** Fractional playback moves the visible wave while keeping numerical steps deterministic. */
-  test_function fractional_wave_motion() std.test.AssertionResult<void> {
-    var s = try app.State();
+  test_function fractional_wave_motion() {
+    var s = app.State();
     s.running = true;
     var initial = s.simulation.plus(0);
-    try s.tick(0.5 / 512.0);
-    try std.test.assert_eq(s.simulation.steps, 0);
-    try std.test.assert_eq(s.simulation.plus(1), 0.0);
-    try std.test.assert(tline.absolute(s.display_plus(1) - initial * 0.5) < 1e-12);
+    s.tick(0.5 / 512.0);
+    std.test.assert_eq(s.simulation.steps, 0);
+    std.test.assert_eq(s.simulation.plus(1), 0.0);
+    std.test.assert(tline.absolute(s.display_plus(1) - initial * 0.5) < 1e-12);
     var frozen = s.display_plus(1);
     s.running = false;
-    try s.tick(1.0);
-    try std.test.assert_eq(s.display_plus(1), frozen);
+    s.tick(1.0);
+    std.test.assert_eq(s.display_plus(1), frozen);
     s.running = true;
-    try s.tick(0.5 / 512.0);
-    try std.test.assert_eq(s.simulation.steps, 1);
-    try std.test.assert_eq(s.display_plus(1), initial);
-    try s.reset();
-    try std.test.assert_eq(s.credit, 0.0);
-    try s.preset(3);
-    try s.advance(511);
+    s.tick(0.5 / 512.0);
+    std.test.assert_eq(s.simulation.steps, 1);
+    std.test.assert_eq(s.display_plus(1), initial);
+    s.reset();
+    std.test.assert_eq(s.credit, 0.0);
+    s.preset(3);
+    s.advance(511);
     s.credit = 0.5;
-    try std.test.assert_eq(s.display_plus(512) + s.display_minus(512), 0.0);
-    return std.test.AssertionResult.Ok;
+    std.test.assert_eq(s.display_plus(512) + s.display_minus(512), 0.0);
+    return;
   }
 
   /** Reserves both polarities of twice the source amplitude so reflected voltage remains visible. */
-  test_function reflection_voltage_limits() std.test.AssertionResult<void> {
-    var s = try app.State();
-    try std.test.assert_eq(s.voltage_scale, 2.0);
-    ignore_error(s.fields.set(0, try String("3")));
-    try s.apply();
-    try std.test.assert_eq(s.voltage_scale, 6.0);
+  test_function reflection_voltage_limits() {
+    var s = app.State();
+    std.test.assert_eq(s.voltage_scale, 2.0);
+    try {
+      s.fields.set(0, String("3"));
+    } catch {}
+    s.apply();
+    std.test.assert_eq(s.voltage_scale, 6.0);
     s.rescale();
-    try std.test.assert_eq(s.voltage_scale, 6.0);
-    ignore_error(s.fields.set(0, try String("-2")));
-    try s.apply();
-    try std.test.assert_eq(s.voltage_scale, 4.0);
-    return std.test.AssertionResult.Ok;
+    std.test.assert_eq(s.voltage_scale, 6.0);
+    try {
+      s.fields.set(0, String("-2"));
+    } catch {}
+    s.apply();
+    std.test.assert_eq(s.voltage_scale, 4.0);
+    return;
   }
 
   /** Sine-pulse settings expose duration, retain their mode on reset, and ignore continuous-sine frequency. */
-  test_function sine_pulse_settings() std.test.AssertionResult<void> {
-    var s = try app.State();
+  test_function sine_pulse_settings() {
+    var s = app.State();
     s.wave_index = 3;
-    try std.test.assert(s.field_visible(8));
-    try std.test.assert(not s.field_visible(9));
-    ignore_error(s.fields.set(9, try String("unused")));
-    try s.apply();
-    try std.test.assert(s.simulation.config.wave == tline.Wave.SinePulse);
-    try s.advance(256);
-    try s.reset();
-    try std.test.assert_eq(s.wave_index, 3);
-    try std.test.assert_eq(s.simulation.steps, 0);
-    try std.test.assert(s.simulation.config.wave == tline.Wave.SinePulse);
-    return std.test.AssertionResult.Ok;
+    std.test.assert(s.field_visible(8));
+    std.test.assert(not s.field_visible(9));
+    try {
+      s.fields.set(9, String("unused"));
+    } catch {}
+    s.apply();
+    std.test.assert(s.simulation.config.wave == tline.Wave.SinePulse);
+    s.advance(256);
+    s.reset();
+    std.test.assert_eq(s.wave_index, 3);
+    std.test.assert_eq(s.simulation.steps, 0);
+    std.test.assert(s.simulation.config.wave == tline.Wave.SinePulse);
+    return;
   }
 
   /** Removes binary floating-point tails and keeps a consistent precision across time units. */
-  test_function stable_time_readout() std.test.AssertionResult<void> {
-    try std.test.assert((try app.time_label(301.26953124999994e-9)).equals_literal("301.270 ns"));
-    try std.test.assert((try app.time_label(50e-9)).equals_literal("50.000 ns"));
-    try std.test.assert((try app.time_label(0.0)).equals_literal("0.000 ns"));
-    try std.test.assert((try app.time_label(12.5e-6)).equals_literal("12.500 us"));
-    try std.test.assert((try app.time_label(12.5e-3)).equals_literal("12.500 ms"));
-    try std.test.assert((try app.time_label(1.25)).equals_literal("1.250 s"));
-    return std.test.AssertionResult.Ok;
+  test_function stable_time_readout() {
+    std.test.assert((app.time_label(301.26953124999994e-9)).equals_literal("301.270 ns"));
+    std.test.assert((app.time_label(50e-9)).equals_literal("50.000 ns"));
+    std.test.assert((app.time_label(0.0)).equals_literal("0.000 ns"));
+    std.test.assert((app.time_label(12.5e-6)).equals_literal("12.500 us"));
+    std.test.assert((app.time_label(12.5e-3)).equals_literal("12.500 ms"));
+    std.test.assert((app.time_label(1.25)).equals_literal("1.250 s"));
+    return;
   }
 
   /** Invalid drafts leave the existing circuit and time untouched. */
-  test_function atomic_settings() std.test.AssertionResult<void> {
-    var s = try app.State();
-    try s.advance(50);
-    ignore_error(s.fields.set(2, try String("invalid")));
-    try s.apply();
-    try std.test.assert_eq(s.simulation.steps, 50);
-    try std.test.assert_eq(s.simulation.config.z, 50.0);
-    ignore_error(s.fields.set(2, try String("75")));
-    try s.apply();
-    try std.test.assert_eq(s.simulation.steps, 0);
-    try std.test.assert_eq(s.simulation.config.z, 75.0);
-    return std.test.AssertionResult.Ok;
+  test_function atomic_settings() {
+    var s = app.State();
+    s.advance(50);
+    try {
+      s.fields.set(2, String("invalid"));
+    } catch {}
+    s.apply();
+    std.test.assert_eq(s.simulation.steps, 50);
+    std.test.assert_eq(s.simulation.config.z, 50.0);
+    try {
+      s.fields.set(2, String("75"));
+    } catch {}
+    s.apply();
+    std.test.assert_eq(s.simulation.steps, 0);
+    std.test.assert_eq(s.simulation.config.z, 75.0);
+    return;
   }
 
   /** An invalid hidden component field cannot block an unrelated circuit. */
-  test_function inactive_fields() std.test.AssertionResult<void> {
-    var s = try app.State();
-    ignore_error(s.fields.set(6, try String("invalid capacitor")));
-    try s.apply();
-    try std.test.assert_eq(s.simulation.config.z, 50.0);
+  test_function inactive_fields() {
+    var s = app.State();
+    try {
+      s.fields.set(6, String("invalid capacitor"));
+    } catch {}
+    s.apply();
+    std.test.assert_eq(s.simulation.config.z, 50.0);
     s.load_index = 3;
-    try s.advance(10);
-    try s.apply();
-    try std.test.assert_eq(s.simulation.steps, 10);
-    return std.test.AssertionResult.Ok;
+    s.advance(10);
+    s.apply();
+    std.test.assert_eq(s.simulation.steps, 10);
+    return;
   }
 
   /** History wraps chronologically without growing; display changes preserve time. */
-  test_function history_and_presets() std.test.AssertionResult<void> {
-    var s = try app.State();
-    try s.advance(512 * 40);
-    try std.test.assert_eq(s.history.size(), 2048);
+  test_function history_and_presets() {
+    var s = app.State();
+    s.advance(512 * 40);
+    std.test.assert_eq(s.history.size(), 2048);
     var first = s.history[s.history_index(0)].time;
     var last = s.history[s.history_index(2047)].time;
-    try std.test.assert(first > 0.0 and last > first);
+    std.test.assert(first > 0.0 and last > first);
     var steps = s.simulation.steps;
     s.components = true;
     s.rescale();
-    try std.test.assert_eq(s.simulation.steps, steps);
+    std.test.assert_eq(s.simulation.steps, steps);
     for (var i: i64 = 0; i < 8; i += 1) {
-      try s.preset(i);
-      try std.test.assert_eq(s.simulation.steps, 0);
+      s.preset(i);
+      std.test.assert_eq(s.simulation.steps, 0);
     }
-    return std.test.AssertionResult.Ok;
+    return;
   }
 }
